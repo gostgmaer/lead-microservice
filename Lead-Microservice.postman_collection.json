@@ -1,0 +1,777 @@
+{
+  "info": {
+    "_postman_id": "lead-microservice-v1",
+    "name": "Lead Microservice",
+    "description": "Complete API collection for the Lead Collection & Pipeline Microservice.\n\n**Base URL**: `{{baseUrl}}` (default: http://localhost:4002)\n\n**Required variables** (set in your environment):\n- `baseUrl` — http://localhost:4002\n- `authToken` — Bearer token from your Auth Service\n- `tenantId` — Your tenant's MongoDB ObjectId\n- `leadId` — Set after creating a lead\n- `attachmentId` — Sub-document `_id` of an attachment",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://localhost:4002",           "type": "string" },
+    { "key": "authToken",    "value": "YOUR_BEARER_TOKEN_HERE",          "type": "string" },
+    { "key": "tenantId",     "value": "64f1a2b3c4d5e6f7a8b9c0d1",        "type": "string" },
+    { "key": "leadId",       "value": "64f1a2b3c4d5e6f7a8b9c0d2",        "type": "string" },
+    { "key": "attachmentId", "value": "64f1a2b3c4d5e6f7a8b9c0d3",        "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/leads/health", "host": ["{{baseUrl}}"], "path": ["api","leads","health"] },
+            "description": "Returns service status, DB connection state, and email service reachability. No auth required."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public — Lead Submission",
+      "item": [
+        {
+          "name": "Submit Lead (public form)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "x-tenant-id",   "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/leads/submit", "host": ["{{baseUrl}}"], "path": ["api","leads","submit"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"email\": \"jane.smith@example.com\",\n  \"phone\": \"+1 555 000 1234\",\n  \"company\": \"Acme Corp\",\n  \"jobTitle\": \"CTO\",\n  \"subject\": \"E-commerce Platform Rebuild\",\n  \"message\": \"We need a full redesign of our e-commerce platform including mobile app integration and payment gateway.\",\n  \"projectType\": \"ecommerce\",\n  \"budget\": \"25k-50k\",\n  \"timeline\": \"2-3months\",\n  \"requirements\": [\"Shopify integration\", \"Mobile app\", \"Analytics dashboard\"],\n  \"category\": \"Sales\",\n  \"source\": \"website\",\n  \"gdprConsent\": true,\n  \"marketingConsent\": true,\n  \"preferredContactMethod\": \"email\",\n  \"utmSource\": \"google\",\n  \"utmMedium\": \"cpc\",\n  \"utmCampaign\": \"spring-2026\",\n  \"tags\": [\"ecommerce\", \"enterprise\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Public endpoint — no Authorization header required. Fires auto-reply and admin notification emails (fire-and-forget). Returns `leadNumber` only (never exposes internal `_id`)."
+          }
+        },
+        {
+          "name": "Submit Lead — Honeypot Spam (should return 200 silently)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "x-tenant-id",   "value": "{{tenantId}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/leads/submit", "host": ["{{baseUrl}}"], "path": ["api","leads","submit"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Bot\",\n  \"lastName\": \"Spam\",\n  \"email\": \"spam@bot.com\",\n  \"subject\": \"Buy cheap pills\",\n  \"message\": \"Click here now!!!\",\n  \"gdprConsent\": true,\n  \"website_url\": \"http://spam.example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "The `website_url` honeypot field is filled — bot is detected. Returns 200 silently but lead is marked as spam and not processed."
+          }
+        },
+        {
+          "name": "Track Proposal View (public redirect)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/view/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","view","1"]
+            },
+            "description": "Public — no auth. Called when a lead clicks the proposal link in their email. Increments viewCount, sets viewedAt, transitions lead to proposal_viewed if currently proposal_sent. Redirects 302 to the actual proposalUrl."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads — Core CRUD",
+      "item": [
+        {
+          "name": "List Leads",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads?page=1&limit=20&status=new&sort=createdAt&order=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads"],
+              "query": [
+                { "key": "page",   "value": "1" },
+                { "key": "limit",  "value": "20" },
+                { "key": "status", "value": "new" },
+                { "key": "sort",   "value": "createdAt" },
+                { "key": "order",  "value": "desc" },
+                { "key": "priority",    "value": "high",   "disabled": true },
+                { "key": "assignedTo",  "value": "",       "disabled": true },
+                { "key": "source",      "value": "website","disabled": true }
+              ]
+            },
+            "description": "Paginated lead list scoped to tenant. Supports filter by status, priority, assignedTo, source, dateFrom, dateTo."
+          }
+        },
+        {
+          "name": "Get Single Lead",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}"]
+            },
+            "description": "Returns full lead detail including proposals array, statusHistory, notes, attachments."
+          }
+        },
+        {
+          "name": "Update Lead Fields",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+1 555 999 8888\",\n  \"company\": \"Acme Corp (Updated)\",\n  \"nextFollowUp\": \"2026-03-14T10:00:00.000Z\",\n  \"tags\": [\"ecommerce\", \"enterprise\", \"vip\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Updates non-status fields. For status transitions use the dedicated status/hold/won/lost/reopen endpoints."
+          }
+        },
+        {
+          "name": "Soft Delete Lead",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}"]
+            },
+            "description": "Sets isDeleted=true. The record is retained in DB. Use hard-delete (admin only) for permanent removal."
+          }
+        },
+        {
+          "name": "Get Lead Score",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","score"]
+            },
+            "description": "Recomputes and returns the lead score (0–100) based on budget, timeline, completeness, engagement, and consent."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads — Search & Analytics",
+      "item": [
+        {
+          "name": "Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/leads/stats", "host": ["{{baseUrl}}"], "path": ["api","leads","stats"] },
+            "description": "Returns overview counts (by status, priority, source), proposal funnel, time series, follow-up due count, revenue totals, and top tags."
+          }
+        },
+        {
+          "name": "Full-Text Search",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/search?q=jane+smith&status=new",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","search"],
+              "query": [
+                { "key": "q",      "value": "jane smith" },
+                { "key": "status", "value": "new", "disabled": true },
+                { "key": "tags",   "value": "enterprise", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Export Leads (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/export?status=won",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","export"],
+              "query": [
+                { "key": "status", "value": "won", "disabled": true },
+                { "key": "dateFrom", "value": "2026-01-01", "disabled": true },
+                { "key": "dateTo",   "value": "2026-03-31", "disabled": true }
+              ]
+            },
+            "description": "Returns a CSV file download. ipAddress, userAgent, isSpam are excluded from default export."
+          }
+        },
+        {
+          "name": "Follow-Up Due Today",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/leads/follow-up", "host": ["{{baseUrl}}"], "path": ["api","leads","follow-up"] },
+            "description": "Returns leads where nextFollowUp <= today."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads — Status Transitions",
+      "item": [
+        {
+          "name": "Generic Status Transition",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","status"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"contacted\",\n  \"note\": \"Called Jane — interested, will review proposal options\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Transitions to any valid next status per the state machine. Rejected with 422 if transition is not allowed.\n\nValid statuses: new, contacted, qualified, disqualified, proposal_draft, proposal_sent, proposal_viewed, proposal_accepted, proposal_declined, proposal_revised, proposal_expired, negotiation, contract_sent, contract_signed, won, lost, on_hold, archived"
+          }
+        },
+        {
+          "name": "Put Lead On Hold",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/hold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","hold"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"onHoldReason\": \"Client on maternity leave — resume in 3 months\",\n  \"resumeDate\": \"2026-06-15T00:00:00.000Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Puts lead on hold. If resumeDate is provided, the scheduler will auto-reopen the lead on that date."
+          }
+        },
+        {
+          "name": "Reopen Lead (from on_hold / lost)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/reopen",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","reopen"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Client reached back out — new budget approved\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Mark Won",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/won",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","won"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Signed off verbally — contract to follow\",\n  \"closedRevenue\": 35000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Marks as won directly. Allowed from: proposal_accepted, contract_signed, negotiation."
+          }
+        },
+        {
+          "name": "Mark Lost",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/lost",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","lost"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lostReason\": \"Went with a competitor — price was a factor\",\n  \"note\": \"Keep warm for future projects\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notes & Communication",
+      "item": [
+        {
+          "name": "Add Note",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/notes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","notes"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Had a follow-up call. Client wants to see a revised timeline before committing.\",\n  \"isInternal\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "`isInternal: true` marks the note as internal (not shared with the lead)."
+          }
+        },
+        {
+          "name": "Send Email to Lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/contact",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","contact"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Following up on your inquiry\",\n  \"message\": \"Hi Jane, I wanted to follow up on our conversation last week. We have some exciting ideas for your e-commerce platform that I'd love to share. Are you available for a call this week?\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Sends email via Email Microservice (fire-and-forget), updates status to 'contacted', increments followUpCount. Rate-limited: 5 emails per hour per IP."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Proposal Workflow",
+      "item": [
+        {
+          "name": "Send Proposal (v1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposalUrl\": \"https://docs.example.com/proposals/P-00001-v1.pdf\",\n  \"quotedAmount\": 38500,\n  \"quotedCurrency\": \"USD\",\n  \"validUntil\": \"2026-04-07T00:00:00.000Z\",\n  \"message\": \"Please find attached our detailed proposal for your e-commerce platform project. This includes a full breakdown of deliverables, timeline, and pricing.\",\n  \"attachmentName\": \"Acme Corp E-commerce Proposal v1.pdf\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates proposal version 1. Returns `{ version: 1, proposalNumber: 'P-00001-v1' }`. Transitions lead to `proposal_sent`. Fires proposal email (fire-and-forget).\n\nAllowed from: qualified, contacted, proposal_draft, negotiation."
+          }
+        },
+        {
+          "name": "Resend Proposal (no version bump)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/resend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","resend"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Just a friendly reminder — our proposal is still available for your review.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Resends the currently active proposal version without creating a new one. Optional message override."
+          }
+        },
+        {
+          "name": "Revise Proposal (new version)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/revise",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","revise"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposalUrl\": \"https://docs.example.com/proposals/P-00001-v2.pdf\",\n  \"quotedAmount\": 34000,\n  \"quotedCurrency\": \"USD\",\n  \"validUntil\": \"2026-04-21T00:00:00.000Z\",\n  \"revisionNote\": \"Reduced scope — removed native mobile app; web-only with responsive design instead\",\n  \"message\": \"We've revised our proposal based on your feedback. The updated quote reflects a web-only approach with a fully responsive design.\",\n  \"attachmentName\": \"Acme Corp E-commerce Proposal v2.pdf\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Creates a new proposal version, marks previous as 'revised', transitions to proposal_sent. `revisionNote` is required."
+          }
+        },
+        {
+          "name": "Accept Proposal",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","accept"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Client confirmed acceptance via email on 2026-03-07\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Transitions to `proposal_accepted`. Fires acceptance email to lead and admin notification (both fire-and-forget). Next step: send contract."
+          }
+        },
+        {
+          "name": "Decline Proposal",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/decline",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","decline"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"declinedReason\": \"Budget constraints — they need to fit within $20k which is below our minimum for this scope\",\n  \"note\": \"May revisit in Q3 if budget increases\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Get Proposal History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","history"]
+            },
+            "description": "Returns all proposal versions sorted by version asc. Each entry includes `isActive` and `isExpired` computed fields."
+          }
+        },
+        {
+          "name": "Get Specific Proposal Version",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/proposal/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","proposal","1"]
+            }
+          }
+        },
+        {
+          "name": "Proposal Funnel Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/leads/proposals/stats", "host": ["{{baseUrl}}"], "path": ["api","leads","proposals","stats"] },
+            "description": "Returns sent/viewed/accepted/declined/expired counts, conversion rates, avg days-to-accept, top decline reasons."
+          }
+        },
+        {
+          "name": "Proposals Expiring Soon",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/proposals/expiring?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","proposals","expiring"],
+              "query": [{ "key": "days", "value": "7" }]
+            },
+            "description": "Returns leads with proposals expiring within the next N days (default: 7)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contract Workflow",
+      "item": [
+        {
+          "name": "Send Contract",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/contract",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","contract"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contractUrl\": \"https://docs.example.com/contracts/C-00001.pdf\",\n  \"message\": \"Please review and sign the attached contract at your earliest convenience. Let us know if you have any questions.\",\n  \"attachmentName\": \"Acme Corp Service Agreement.pdf\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Allowed only from `proposal_accepted`. Transitions to `contract_sent`. Fires contract email to lead (fire-and-forget)."
+          }
+        },
+        {
+          "name": "Mark Contract Signed → Won",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/contract/signed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","contract","signed"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"DocuSign confirmation received\",\n  \"signedDate\": \"2026-03-07T14:30:00.000Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Transitions contract_signed → won automatically. Fires contractSigned + wonNotification emails (fire-and-forget)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attachments (via File Upload Microservice)",
+      "description": "Files must be uploaded to your File Upload Microservice first. Once uploaded, register the returned URL and file ID here to associate it with the lead.",
+      "item": [
+        {
+          "name": "Register Attachments (single)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/attachments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","attachments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileId\": \"file_abc123xyz\",\n  \"filename\": \"requirements-brief.pdf\",\n  \"url\": \"https://cdn.example.com/uploads/file_abc123xyz/requirements-brief.pdf\",\n  \"mimetype\": \"application/pdf\",\n  \"size\": 204800\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Register a single file that was already uploaded to the File Upload Microservice. Provide the fileId and public URL returned by that service."
+          }
+        },
+        {
+          "name": "Register Attachments (multiple)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/attachments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","attachments"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"attachments\": [\n    {\n      \"fileId\": \"file_abc123xyz\",\n      \"filename\": \"requirements-brief.pdf\",\n      \"url\": \"https://cdn.example.com/uploads/file_abc123xyz/requirements-brief.pdf\",\n      \"mimetype\": \"application/pdf\",\n      \"size\": 204800\n    },\n    {\n      \"fileId\": \"file_def456uvw\",\n      \"filename\": \"wireframes-v1.zip\",\n      \"url\": \"https://cdn.example.com/uploads/file_def456uvw/wireframes-v1.zip\",\n      \"mimetype\": \"application/zip\",\n      \"size\": 1572864\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Register multiple files at once. Duplicate fileIds are silently skipped."
+          }
+        },
+        {
+          "name": "Remove Attachment",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/attachments/{{attachmentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","attachments","{{attachmentId}}"]
+            },
+            "description": ":attachmentId is the MongoDB sub-document _id (from lead.attachments[]._id). This only removes the reference from the lead record — actual file deletion from the upload service is the caller's responsibility."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk Update Status / Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/leads/bulk-update", "host": ["{{baseUrl}}"], "path": ["api","leads","bulk-update"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"64f1a2b3c4d5e6f7a8b9c0d2\",\n    \"64f1a2b3c4d5e6f7a8b9c0d4\",\n    \"64f1a2b3c4d5e6f7a8b9c0d5\"\n  ],\n  \"status\": \"contacted\",\n  \"assignedTo\": \"64f1a2b3c4d5e6f7a8b9c0d9\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Bulk Soft Delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{baseUrl}}/api/leads/bulk-delete", "host": ["{{baseUrl}}"], "path": ["api","leads","bulk-delete"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"64f1a2b3c4d5e6f7a8b9c0d2\",\n    \"64f1a2b3c4d5e6f7a8b9c0d4\"\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Import Leads from CSV",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/leads/import", "host": ["{{baseUrl}}"], "path": ["api","leads","import"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/your/leads.csv",
+                  "description": "CSV file with columns: firstName, lastName, email, phone, company, subject, message, source, tags"
+                }
+              ]
+            },
+            "description": "Parses and batch-inserts leads from CSV. Invalid rows are skipped. Returns `{ imported, skipped, errors }`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Only",
+      "description": "These endpoints require role: admin or super_admin",
+      "item": [
+        {
+          "name": "List Spam Leads",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/leads/spam", "host": ["{{baseUrl}}"], "path": ["api","leads","spam"] }
+          }
+        },
+        {
+          "name": "Toggle Spam Flag",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/spam",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","spam"]
+            },
+            "description": "Toggles isSpam on the lead. No body required."
+          }
+        },
+        {
+          "name": "Hard Delete (permanent)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/hard-delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","hard-delete"]
+            },
+            "description": "Permanently removes the lead document from the database. Irreversible."
+          }
+        },
+        {
+          "name": "Force Reopen (from archived / disqualified)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}/reopen-admin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","{{leadId}}","reopen-admin"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Reopening — new contact at the company reached out\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Manually Trigger Proposal Expiry Check",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/proposals/expire-check",
+              "host": ["{{baseUrl}}"],
+              "path": ["api","leads","proposals","expire-check"]
+            },
+            "description": "Manually runs the proposal expiry check job (normally runs every hour via cron). Expires all proposals where validUntil < now."
+          }
+        }
+      ]
+    }
+  ]
+}
