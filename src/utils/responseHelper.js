@@ -17,27 +17,57 @@ const HTTP_STATUS = {
   SERVICE_UNAVAILABLE: 503,
 };
 
-const sendSuccess = (res, { data = null, message = 'Success', statusCode = HTTP_STATUS.OK, meta = null } = {}) => {
-  const response = { success: true, statusCode, message };
-  if (data !== null) response.data = data;
-  if (meta !== null) response.meta = meta;
+/**
+ * Recursively transform response data:
+ *  - Renames `_id` → `id` (as string)
+ *  - Removes `__v`
+ */
+const serialize = (val) => {
+  if (val === null || val === undefined) return val;
+  if (typeof val !== 'object') return val;
+  if (val instanceof Date) return val;
+  if (Buffer.isBuffer(val)) return val;
+  if (Array.isArray(val)) return val.map(serialize);
+
+  const src = typeof val.toJSON === 'function' ? val.toJSON() : val;
+  if (typeof src !== 'object' || src === null) return src;
+
+  const out = {};
+  for (const key of Object.keys(src)) {
+    if (key === '__v' || key === '_id' || key === 'id') continue;
+    out[key] = serialize(src[key]);
+  }
+  const rawId = src.id !== undefined ? src.id : src._id;
+  if (rawId !== undefined) out.id = String(rawId);
+
+  return out;
+};
+
+const sendSuccess = (res, { data = null, message = 'Success', statusCode = HTTP_STATUS.OK } = {}) => {
+  const response = { success: true, message };
+  if (data !== null && data !== undefined) response.data = serialize(data);
   return res.status(statusCode).json(response);
 };
 
-const sendCreated = (res, { data = null, message = 'Created successfully', meta = null } = {}) =>
-  sendSuccess(res, { data, message, statusCode: HTTP_STATUS.CREATED, meta });
+const sendCreated = (res, { data = null, message = 'Created successfully' } = {}) =>
+  sendSuccess(res, { data, message, statusCode: HTTP_STATUS.CREATED });
 
-const sendPaginated = (res, { data, message = 'Success' } = {}) =>
-  res.status(HTTP_STATUS.OK).json({ success: true, statusCode: HTTP_STATUS.OK, message, ...data });
+const sendPaginated = (res, { docs, message = 'Success', page, pageSize, totalRecords, totalPages, hasNext, hasPrev } = {}) => {
+  const response = { success: true, message };
+  if (docs !== null && docs !== undefined) response.data = serialize(docs);
+  response.pagination = { page, pageSize, totalRecords, totalPages, hasNext, hasPrev };
+  return res.status(HTTP_STATUS.OK).json(response);
+};
 
-const sendError = (res, { message = 'An error occurred', statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, errors = null, code = null } = {}) => {
-  const response = { success: false, statusCode, message };
-  if (errors) response.errors = errors;
-  if (code) response.code = code;
-  return res.status(statusCode).json(response);
+const sendError = (res, { message = 'An error occurred', statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, code = null, details = null, hint = null } = {}) => {
+  const err = {};
+  if (code) err.code = code;
+  if (details) err.details = details;
+  if (hint) err.hint = hint;
+  return res.status(statusCode).json({ success: false, message, error: err });
 };
 
 const errorResponse = (res, message, statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR) =>
   sendError(res, { message, statusCode });
 
-module.exports = { sendSuccess, sendCreated, sendPaginated, sendError, errorResponse, HTTP_STATUS };
+module.exports = { sendSuccess, sendCreated, sendPaginated, sendError, errorResponse, HTTP_STATUS, serialize };

@@ -50,18 +50,14 @@ const listLeads = catchAsync(async (req, res) => {
   });
 
   return sendPaginated(res, {
-    data: {
-      result: result.docs,
-      pagination: {
-        page: result.page,
-        totalPages: result.pages,
-        total: result.total,
-        hasNext: result.hasNext,
-        hasPrev: result.hasPrev,
-        limit: result.limit,
-      },
-    },
+    docs: result.docs,
     message: 'Leads retrieved successfully',
+    page: result.page,
+    pageSize: result.limit,
+    totalRecords: result.total,
+    totalPages: result.pages,
+    hasNext: result.hasNext,
+    hasPrev: result.hasPrev,
   });
 });
 
@@ -226,10 +222,10 @@ const toggleSpam = catchAsync(async (req, res) => {
   return sendSuccess(res, { data: { isSpam: lead.isSpam }, message: 'Spam flag toggled' });
 });
 
-// DELETE /api/leads/:id/hard-delete  (admin)
+// DELETE /api/leads/:id/hard-delete  — hard deletes are disabled; redirected to soft-delete
 const hardDelete = catchAsync(async (req, res) => {
-  await leadService.hardDeleteLead(req.params.id, req.tenantId);
-  return sendSuccess(res, { message: 'Lead permanently deleted' });
+  await leadService.softDeleteLead(req.params.id, req.tenantId, req.user._id);
+  return sendSuccess(res, { message: 'Lead deleted' });
 });
 
 // PATCH /api/leads/:id/reopen-admin  (admin)

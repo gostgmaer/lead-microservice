@@ -278,10 +278,9 @@ async function softDeleteLead(id, tenantId, deletedBy) {
   return lead;
 }
 
-async function hardDeleteLead(id, tenantId) {
-  const lead = await Lead.findOneAndDelete({ _id: id, tenantId });
-  if (!lead) throw AppError.notFound('Lead not found');
-  return lead;
+async function hardDeleteLead(id, tenantId, deletedBy) {
+  // Hard deletes are disabled by policy — all deletions are soft-deletes
+  return softDeleteLead(id, tenantId, deletedBy);
 }
 
 async function assignLead(leadId, tenantId, assignedTo, assignedBy) {
