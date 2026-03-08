@@ -36,6 +36,13 @@ const config = {
   cors: {
     origins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(','),
   },
+  // Tenant configuration.
+  // TENANCY_ENABLED=true  → x-tenant-id is enforced on every request (or DEFAULT_TENANT_ID fallback).
+  // TENANCY_ENABLED=false → tenant is optional; services work without tenant scoping.
+  tenant: {
+    enabled: process.env.TENANCY_ENABLED === 'true',
+    defaultTenantId: process.env.DEFAULT_TENANT_ID ? process.env.DEFAULT_TENANT_ID.trim() : null,
+  },
   redis: {
     enabled: process.env.REDIS_ENABLED === 'true',
     url: process.env.REDIS_URL || null,

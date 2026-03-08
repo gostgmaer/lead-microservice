@@ -150,8 +150,7 @@ async function runHoldResumeCheck() {
  * Falls back to a simple in-process flag when Redis is not configured.
  */
 
-// ── Distributed lock helpers ──────────────────────────────────────────────────
-const config = require('../config/setting');
+
 
 let redisLock = null;
 if (config.redis && config.redis.enabled && config.redis.url) {
