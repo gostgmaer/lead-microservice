@@ -69,131 +69,127 @@ const attachmentSchema = new mongoose.Schema({
 // ─── Main schema ──────────────────────────────────────────────────────────────
 
 const leadSchema = new mongoose.Schema(
-  {
-    // Identity
-    tenantId:    { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
-    leadNumber:  { type: Number },
-    externalId:  { type: String },
+	{
+		// Identity
+		tenantId: { type: String, required: true, trim: true, index: true },
+		leadNumber: { type: Number },
+		externalId: { type: String },
 
-    // Contact info
-    firstName:   { type: String, required: true, trim: true },
-    lastName:    { type: String, required: true, trim: true },
-    email:       { type: String, required: true, lowercase: true, trim: true },
-    phone:       { type: String, trim: true },
-    company:     { type: String, trim: true },
-    jobTitle:    { type: String },
-    website:     { type: String },
-    linkedIn:    { type: String },
-    country:     { type: String },
-    city:        { type: String },
-    timezone:    { type: String },
+		// Contact info
+		firstName: { type: String, required: true, trim: true },
+		lastName: { type: String, required: true, trim: true },
+		email: { type: String, required: true, lowercase: true, trim: true },
+		phone: { type: String, trim: true },
+		company: { type: String, trim: true },
+		jobTitle: { type: String },
+		website: { type: String },
+		linkedIn: { type: String },
+		country: { type: String },
+		city: { type: String },
+		timezone: { type: String },
 
-    // Qualification
-    status:                  { type: String, enum: STATUS_ENUM, default: 'new', index: true },
-    pipelineStage:           { type: String, default: 'New' },
-    priority:                { type: String, enum: PRIORITY_ENUM, default: 'medium' },
-    score:                   { type: Number, default: 0, min: 0, max: 100 },
-    qualifiedAt:             { type: Date },
-    disqualifiedAt:          { type: Date },
-    disqualificationReason:  { type: String },
-    onHoldAt:                { type: Date },
-    onHoldReason:            { type: String },
-    resumeDate:              { type: Date },
-    reopenedAt:              { type: Date },
-    reopenNote:              { type: String },
+		// Qualification
+		status: { type: String, enum: STATUS_ENUM, default: "new", index: true },
+		pipelineStage: { type: String, default: "New" },
+		priority: { type: String, enum: PRIORITY_ENUM, default: "medium" },
+		score: { type: Number, default: 0, min: 0, max: 100 },
+		qualifiedAt: { type: Date },
+		disqualifiedAt: { type: Date },
+		disqualificationReason: { type: String },
+		onHoldAt: { type: Date },
+		onHoldReason: { type: String },
+		resumeDate: { type: Date },
+		reopenedAt: { type: Date },
+		reopenNote: { type: String },
 
-    // Project / Inquiry Details
-    subject:     { type: String, required: true, trim: true },
-    message:     { type: String, required: true, maxlength: 5000 },
-    projectType: { type: String, enum: PROJECT_TYPE_ENUM },
-    budget:      { type: String, enum: BUDGET_ENUM },
-    timeline:    { type: String, enum: TIMELINE_ENUM },
-    requirements:{ type: [String] },
-    category:    { type: String, enum: CATEGORY_ENUM },
+		// Project / Inquiry Details
+		subject: { type: String, required: true, trim: true },
+		message: { type: String, required: true, maxlength: 5000 },
+		projectType: { type: String, enum: PROJECT_TYPE_ENUM },
+		budget: { type: String, enum: BUDGET_ENUM },
+		timeline: { type: String, enum: TIMELINE_ENUM },
+		requirements: { type: [String] },
+		category: { type: String, enum: CATEGORY_ENUM },
 
-    // Attachments
-    attachments: { type: [attachmentSchema], default: [] },
+		// Attachments
+		attachments: { type: [attachmentSchema], default: [] },
 
-    // Assignment
-    assignedTo:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    assignedAt:  { type: Date },
-    ownedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+		// Assignment
+		assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		assignedAt: { type: Date },
+		ownedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    // Activity
-    notes:          { type: [noteSchema], default: [] },
-    statusHistory:  { type: [statusHistorySchema], default: [] },
-    lastContactedAt: { type: Date },
-    nextFollowUp:    { type: Date },
-    followUpCount:   { type: Number, default: 0 },
+		// Activity
+		notes: { type: [noteSchema], default: [] },
+		statusHistory: { type: [statusHistorySchema], default: [] },
+		lastContactedAt: { type: Date },
+		nextFollowUp: { type: Date },
+		followUpCount: { type: Number, default: 0 },
 
-    // Proposal workflow — versioned array
-    proposals:              { type: [proposalSchema], default: [] },
-    activeProposalVersion:  { type: Number, default: 0 },
-    proposalUrl:            { type: String },
-    quotedAmount:           { type: Number },
-    quotedCurrency:         { type: String, default: 'USD' },
-    quotedAt:               { type: Date },
-    quotedBy:               { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    proposalSentAt:         { type: Date },
-    proposalViewedAt:       { type: Date },
-    proposalAcceptedAt:     { type: Date },
-    proposalDeclinedAt:     { type: Date },
-    proposalDeclinedReason: { type: String },
-    proposalExpiresAt:      { type: Date },
-    proposalRevisionCount:  { type: Number, default: 0 },
+		// Proposal workflow — versioned array
+		proposals: { type: [proposalSchema], default: [] },
+		activeProposalVersion: { type: Number, default: 0 },
+		proposalUrl: { type: String },
+		quotedAmount: { type: Number },
+		quotedCurrency: { type: String, default: "USD" },
+		quotedAt: { type: Date },
+		quotedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		proposalSentAt: { type: Date },
+		proposalViewedAt: { type: Date },
+		proposalAcceptedAt: { type: Date },
+		proposalDeclinedAt: { type: Date },
+		proposalDeclinedReason: { type: String },
+		proposalExpiresAt: { type: Date },
+		proposalRevisionCount: { type: Number, default: 0 },
 
-    // Contract
-    contractUrl:      { type: String },
-    contractSentAt:   { type: Date },
-    contractSentBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    contractSignedAt: { type: Date },
-    contractNote:     { type: String },
+		// Contract
+		contractUrl: { type: String },
+		contractSentAt: { type: Date },
+		contractSentBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		contractSignedAt: { type: Date },
+		contractNote: { type: String },
 
-    // Source & UTM
-    source:      { type: String, enum: SOURCE_ENUM, default: 'website' },
-    medium:      { type: String },
-    campaign:    { type: String },
-    referrer:    { type: String },
-    utmSource:   { type: String },
-    utmMedium:   { type: String },
-    utmCampaign: { type: String },
-    utmContent:  { type: String },
-    utmTerm:     { type: String },
-    landingPage: { type: String },
+		// Source & UTM
+		source: { type: String, enum: SOURCE_ENUM, default: "website" },
+		medium: { type: String },
+		campaign: { type: String },
+		referrer: { type: String },
+		utmSource: { type: String },
+		utmMedium: { type: String },
+		utmCampaign: { type: String },
+		utmContent: { type: String },
+		utmTerm: { type: String },
+		landingPage: { type: String },
 
-    // Consent & Compliance
-    gdprConsent:            { type: Boolean, default: false },
-    gdprConsentAt:          { type: Date },
-    gdprVersion:            { type: String },
-    marketingConsent:       { type: Boolean, default: false },
-    preferredContactMethod: { type: String, enum: CONTACT_METHOD_ENUM, default: 'email' },
-    preferredContactTime:   { type: String },
+		// Consent & Compliance
+		gdprConsent: { type: Boolean, default: false },
+		gdprConsentAt: { type: Date },
+		gdprVersion: { type: String },
+		marketingConsent: { type: Boolean, default: false },
+		preferredContactMethod: { type: String, enum: CONTACT_METHOD_ENUM, default: "email" },
+		preferredContactTime: { type: String },
 
-    // Custom
-    customFields: { type: Map, of: mongoose.Schema.Types.Mixed },
-    tags:         { type: [String], index: true },
-    labels:       { type: [String] },
-    siteKey:      { type: String },
+		// Custom
+		customFields: { type: Map, of: mongoose.Schema.Types.Mixed },
+		tags: { type: [String], index: true },
+		labels: { type: [String] },
+		siteKey: { type: String },
 
-    // Technical Metadata
-    ipAddress:  { type: String },
-    userAgent:  { type: String },
-    isSpam:     { type: Boolean, default: false, index: true },
-    spamScore:  { type: Number },
+		// Technical Metadata
+		ipAddress: { type: String },
+		userAgent: { type: String },
+		isSpam: { type: Boolean, default: false, index: true },
+		spamScore: { type: Number },
 
-    // Soft delete
-    isDeleted:  { type: Boolean, default: false, index: true },
-    deletedAt:  { type: Date },
-    deletedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+		// Soft delete
+		isDeleted: { type: Boolean, default: false, index: true },
+		deletedAt: { type: Date },
+		deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
-    createdBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    updatedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  },
-  {
-    timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
-  }
+		createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+		updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+	},
+	{ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } },
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────

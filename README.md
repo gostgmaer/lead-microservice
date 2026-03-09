@@ -30,7 +30,7 @@ Runs on `PORT=4002` by default.
 - **Multi-tenant**: every document carries `tenantId`. All queries scoped by it.
 - **Email is external**: delegates all email to `POST ${EMAIL_SERVICE_URL}/send-email`. Never sends email directly.
 - **Fire-and-forget emails**: email calls are never awaited — API response is never blocked by email delivery.
-- **Token validation**: verifies Bearer tokens by calling `POST ${AUTH_SERVICE_URL}/user/auth/verify/session`. No local `jwt.verify()`.
+- **Token validation**: verifies Bearer tokens by calling `POST ${AUTH_SERVICE_URL}/api/auth/token/verify`. No local `jwt.verify()`.
 - **State machine**: lead status transitions are enforced by `leadService.updateLeadStatus()`. All side effects (fields, emails, history) are applied automatically.
 
 ---

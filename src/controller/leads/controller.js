@@ -15,7 +15,7 @@ const DASH = config.dashboard.url;
 
 // POST /api/leads/submit  — public
 const submitLead = catchAsync(async (req, res) => {
-  const tenantId = req.headers['x-tenant-id'];
+  const tenantId = req.tenantId;
 
   const lead = await leadService.createLead(req.body, tenantId, {
     ipAddress: req.ip,
