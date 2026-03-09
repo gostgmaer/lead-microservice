@@ -49,5 +49,5 @@ All variables must be set in `.env` (copy from `env.sample`).
 ## Notes
 
 - **Email delivery is fire-and-forget** — a failure to deliver email never blocks or errors an API response.
-- **Token validation is delegated** — this service calls `POST ${AUTH_SERVICE_URL}/user/auth/verify/session` for every authenticated request. It never validates JWTs locally.
+- **Token validation is delegated** — this service calls `POST ${AUTH_SERVICE_URL}/api/auth/token/verify` for every authenticated request. It never validates JWTs locally.
 - **Multi-tenant** — every database operation is scoped by `tenantId`. Never query without it.

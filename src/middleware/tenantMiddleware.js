@@ -3,34 +3,32 @@
  * Extracts tenantId from x-tenant-id header for public routes,
  * or from req.user.tenantId for authenticated routes.
  *
- * TENANCY_ENABLED=true  → tenant is enforced; 400 if missing.
- * TENANCY_ENABLED=false → tenant is optional; req.tenantId = null and services continue.
+ * Tenant is always resolved from x-tenant-id or DEFAULT_TENANT_ID fallback.
  */
 const AppError = require('../utils/appError');
 const config   = require('../config/setting');
 
 // Resolved once at startup — avoids repeated env reads on every request.
-const TENANCY_ENABLED   = config.tenant.enabled;
-const DEFAULT_TENANT_ID = config.tenant.defaultTenantId || null;
+const TENANCY_ENABLED = config.tenant.enabled;
+const DEFAULT_TENANT_ID = config.tenant.defaultTenantId || "easydev";
 
 /**
  * Resolves tenantId from header or DEFAULT_TENANT_ID fallback.
- * Enforces presence only when TENANCY_ENABLED=true.
  * Used on public routes (e.g. lead submission).
  */
 const requireTenantHeader = (req, res, next) => {
+  if (!TENANCY_ENABLED) {
+		req.tenantId = null;
+		return next();
+	}
+
   const tenantId = ((req.headers['x-tenant-id'] || DEFAULT_TENANT_ID) || '').trim();
 
   if (!tenantId) {
-    if (TENANCY_ENABLED) {
-      return next(AppError.badRequest(
-        'x-tenant-id header is required. Set DEFAULT_TENANT_ID in the service env or pass the header explicitly.'
-      ));
-    }
-    // Non-tenanted mode — continue without tenant scoping.
-    req.tenantId = null;
-    return next();
-  }
+		// Fallback tenant when no header is provided.
+		req.tenantId = "easydev";
+		return next();
+	}
 
   // Basic ObjectId format check (24 hex chars) or simple slug
   const isObjectId = /^[a-f\d]{24}$/i.test(tenantId);
@@ -44,14 +42,15 @@ const requireTenantHeader = (req, res, next) => {
 
 /**
  * Sets req.tenantId from the authenticated user's JWT payload.
- * In non-tenanted mode (TENANCY_ENABLED=false), user tokens may not carry
- * tenantId — that is allowed; req.tenantId is set to null and the route continues.
+ * Falls back to DEFAULT_TENANT_ID when token has no tenantId.
  */
 const setTenantFromUser = (req, res, next) => {
-  const tenantId = req.user?.tenantId || null;
-  if (!tenantId && TENANCY_ENABLED) {
-    return next(AppError.badRequest('Tenant context missing from token'));
-  }
+  if (!TENANCY_ENABLED) {
+		req.tenantId = null;
+		return next();
+	}
+
+  const tenantId = req.user?.tenantId || DEFAULT_TENANT_ID || "easydev";
   req.tenantId = tenantId;
   next();
 };

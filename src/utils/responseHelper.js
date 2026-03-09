@@ -59,12 +59,22 @@ const sendPaginated = (res, { docs, message = 'Success', page, pageSize, totalRe
   return res.status(HTTP_STATUS.OK).json(response);
 };
 
-const sendError = (res, { message = 'An error occurred', statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR, code = null, details = null, hint = null } = {}) => {
-  const err = {};
-  if (code) err.code = code;
-  if (details) err.details = details;
-  if (hint) err.hint = hint;
-  return res.status(statusCode).json({ success: false, message, error: err });
+const sendError = (
+	res,
+	{
+		message = "An error occurred",
+		statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR,
+		code = null,
+		details = null,
+		errors = null,
+		hint = null,
+	} = {},
+) => {
+	const err = {};
+	if (code) err.code = code;
+	if (details || errors) err.details = details || errors;
+	if (hint) err.hint = hint;
+	return res.status(statusCode).json({ success: false, message, error: err });
 };
 
 const errorResponse = (res, message, statusCode = HTTP_STATUS.INTERNAL_SERVER_ERROR) =>

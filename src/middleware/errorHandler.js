@@ -15,13 +15,13 @@ const notFound = (req, res, next) => {
 const globalErrorHandler = (err, req, res, _next) => {
   let statusCode = err.statusCode || HTTP_STATUS.INTERNAL_SERVER_ERROR;
   let message = err.message || 'Internal server error';
-  let errors = err.errors || null;
+  let details = err.details || err.errors || null;
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
     statusCode = 422;
     message = 'Validation failed';
-    errors = Object.values(err.errors).map((e) => ({ field: e.path, message: e.message }));
+    details = Object.values(err.errors).map((e) => ({ field: e.path, message: e.message }));
   }
 
   // Mongoose duplicate key
@@ -37,7 +37,7 @@ const globalErrorHandler = (err, req, res, _next) => {
     message = `Invalid ${err.path}: ${err.value}`;
   }
 
-  return sendError(res, { message, statusCode, errors });
+  return sendError(res, { message, statusCode, details });
 };
 
 module.exports = { catchAsync, notFound, globalErrorHandler };
