@@ -1,58 +1,57 @@
 /**
  * Tenant middleware.
- * Extracts tenantId from x-tenant-id header for public routes,
- * or from req.user.tenantId for authenticated routes.
+ * Both middlewares resolve tenantId from the x-tenant-id header (injected by
+ * app.js if omitted, so clients never need to send it explicitly in single-tenant mode).
  *
- * Tenant is always resolved from x-tenant-id or DEFAULT_TENANT_ID fallback.
+ * requireTenantHeader — public routes
+ * setTenantFromUser   — authenticated routes (same header-based resolution)
  */
-const AppError = require('../utils/appError');
-const config   = require('../config/setting');
+import AppError from '../utils/appError.js';
+import { config } from '../config/index.js';
 
-// Resolved once at startup — avoids repeated env reads on every request.
 const TENANCY_ENABLED = config.tenant.enabled;
-const DEFAULT_TENANT_ID = config.tenant.defaultTenantId || "easydev";
+const DEFAULT_TENANT_ID = config.tenant.defaultTenantId || null;
 
-/**
- * Resolves tenantId from header or DEFAULT_TENANT_ID fallback.
- * Used on public routes (e.g. lead submission).
- */
-const requireTenantHeader = (req, res, next) => {
+function resolveFromHeader(req, res, next) {
   if (!TENANCY_ENABLED) {
-		req.tenantId = null;
-		return next();
-	}
-
+    req.tenantId = null;
+    return next();
+  }
   const tenantId = ((req.headers['x-tenant-id'] || DEFAULT_TENANT_ID) || '').trim();
-
   if (!tenantId) {
-		// Fallback tenant when no header is provided.
-		req.tenantId = "easydev";
-		return next();
-	}
-
-  // Basic ObjectId format check (24 hex chars) or simple slug
-  const isObjectId = /^[a-f\d]{24}$/i.test(tenantId);
-  const isSlug     = /^[a-z0-9_-]{2,64}$/i.test(tenantId);
-  if (!isObjectId && !isSlug) {
+    req.tenantId = DEFAULT_TENANT_ID;
+    return next();
+  }
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId);
+  const isMongoObjectId = /^[a-f\d]{24}$/i.test(tenantId);
+  const isSlug = /^[a-z0-9_-]{2,64}$/i.test(tenantId);
+  if (!isUuid && !isMongoObjectId && !isSlug) {
     return next(AppError.badRequest('Invalid x-tenant-id format'));
   }
   req.tenantId = tenantId;
   next();
-};
+}
 
-/**
- * Sets req.tenantId from the authenticated user's JWT payload.
- * Falls back to DEFAULT_TENANT_ID when token has no tenantId.
- */
-const setTenantFromUser = (req, res, next) => {
+function resolveFromUser(req, res, next) {
   if (!TENANCY_ENABLED) {
-		req.tenantId = null;
-		return next();
-	}
-
-  const tenantId = req.user?.tenantId || DEFAULT_TENANT_ID || "easydev";
+    req.tenantId = null;
+    return next();
+  }
+  // Enforce secure JWT tenant claim first, fallback to header only if user has no tenantId (e.g. superadmin)
+  const tenantId = (req.user?.tenantId || req.headers['x-tenant-id'] || DEFAULT_TENANT_ID || '').trim();
+  if (!tenantId) {
+    req.tenantId = DEFAULT_TENANT_ID;
+    return next();
+  }
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tenantId);
+  const isMongoObjectId = /^[a-f\d]{24}$/i.test(tenantId);
+  const isSlug = /^[a-z0-9_-]{2,64}$/i.test(tenantId);
+  if (!isUuid && !isMongoObjectId && !isSlug) {
+    return next(AppError.badRequest('Invalid x-tenant-id format'));
+  }
   req.tenantId = tenantId;
   next();
-};
+}
 
-module.exports = { requireTenantHeader, setTenantFromUser };
+export const requireTenantHeader = resolveFromHeader;
+export const setTenantFromUser   = resolveFromUser;

@@ -2,18 +2,22 @@
  * Express application setup
  */
 
-require('dotenv').config();
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import compression from 'compression';
+import path from 'path';
 
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const compression = require('compression');
-const path = require('path');
+import { randomUUID } from 'crypto';
 
-const config = require('./src/config/setting');
-const { notFound, globalErrorHandler } = require('./src/middleware/errorHandler');
-const leadRoutes = require('./src/routes/leads');
+import config from './src/config/setting.js';
+import { notFound, errorHandler } from './src/middleware/errorHandler.js';
+import leadRoutes from './src/routes/leads.js';
+import newsletterRoutes from './src/routes/newsletter.js';
+import uploadRoutes from './src/routes/upload.js';
+import calculatorRoutes from './src/routes/calculator.js';
 
 const app = express();
 
@@ -50,9 +54,10 @@ app.use((req, res, next) => {
 // ─── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
 // ─── Request ID + Response envelope ─────────────────────────────────────────────
 app.use((req, res, next) => {
-  req.requestId = req.headers['x-request-id'] || require('crypto').randomUUID();
+  req.requestId = req.headers['x-request-id'] || randomUUID();
   res.setHeader('X-Request-ID', req.requestId);
   const _json = res.json.bind(res);
   res.json = function (body) {
@@ -67,11 +72,15 @@ app.use((req, res, next) => {
   };
   next();
 });
+
 // ─── Static files (uploads) ───────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/leads', leadRoutes);
+app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/calculator', calculatorRoutes);
 
 // ─── Root health check ────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -85,9 +94,9 @@ app.get('/', (req, res) => {
 
 // ─── 404 & Error Handler ──────────────────────────────────────────────────────
 app.use(notFound);
-app.use(globalErrorHandler);
+app.use(errorHandler);
 
-module.exports = app;
+export default app;
 
 // ─── Response transform ───────────────────────────────────────────────────────
 function _cleanResponse(val) {

@@ -1,17 +1,13 @@
 /**
- * Lead Upload Middleware
- *
- * Lead file uploads are handled by the external File Upload Microservice.
- * This file only provides the multer configuration for CSV import.
+ * Lead Upload Middleware — multer config for CSV import only.
+ * All other file uploads go through the external File Upload Microservice.
  */
+import multer from 'multer';
 
-const multer = require('multer');
-
-// CSV import — in-memory only (max 10 MB)
 const csvUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'text/csv' || file.mimetype === 'application/csv' || file.originalname.endsWith('.csv')) {
       return cb(null, true);
     }
@@ -19,11 +15,11 @@ const csvUpload = multer({
   },
 });
 
-const handleUploadErrors = (err, req, res, next) => {
+const handleUploadErrors = (err, _req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(400).json({ success: false, message: err.message });
   }
   next(err);
 };
 
-module.exports = { csvUpload, handleUploadErrors };
+export { csvUpload, handleUploadErrors };

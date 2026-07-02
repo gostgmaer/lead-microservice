@@ -1,8 +1,8 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const counterSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
-  seq: { type: Number, default: 0 },
+  seq:  { type: Number, default: 0 },
 });
 
 counterSchema.statics.nextSequence = async function (name) {
@@ -14,4 +14,4 @@ counterSchema.statics.nextSequence = async function (name) {
   return doc.seq;
 };
 
-module.exports = mongoose.models.Counter || mongoose.model('Counter', counterSchema);
+export default mongoose.models.Counter || mongoose.model('Counter', counterSchema);

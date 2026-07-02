@@ -1,4 +1,4 @@
-const axios = require('axios');
+import axios from 'axios';
 
 const instance = axios.create({
   timeout: 10000,
@@ -36,4 +36,4 @@ async function apiCall(url, options = {}, overrideConfig = {}) {
   }
 }
 
-module.exports = { apiCall, instance };
+export { apiCall, instance };
