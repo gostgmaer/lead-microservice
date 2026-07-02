@@ -17,7 +17,22 @@ const config = {
 		apiKey: process.env.EMAIL_SERVICE_API_KEY || "",
 		adminEmail: process.env.ADMIN_EMAIL || "admin@example.com",
 	},
-	auth: { serviceUrl: process.env.AUTH_SERVICE_URL || "http://localhost:4002" },
+	auth: {
+		serviceUrl: process.env.AUTH_SERVICE_URL || "http://localhost:4002",
+		// IAM-issued JWT verification (local, no network hop) — same convention
+		// as the gateway and every other product service: RS256 with IAM's
+		// public key (raw PEM or base64-encoded PEM), HS256 shared-secret as
+		// the transition fallback. Issuer/audience enforced when configured.
+		jwtPublicKey: (() => {
+			const raw = process.env.JWT_PUBLIC_KEY;
+			if (!raw || !String(raw).trim()) return null;
+			const trimmed = String(raw).trim();
+			return trimmed.startsWith("-----") ? trimmed : Buffer.from(trimmed, "base64").toString("utf8");
+		})(),
+		jwtHsSecret: (process.env.JWT_SECRET || "").trim() || null,
+		jwtIssuer: (process.env.JWT_ISSUER || "").trim() || null,
+		jwtAudience: (process.env.JWT_AUDIENCE || "").trim() || null,
+	},
 	dashboard: { url: process.env.DASHBOARD_URL || "http://localhost:3000" },
 	fileUpload: {
 		serviceUrl: process.env.FILE_UPLOAD_SERVICE_URL || '',
