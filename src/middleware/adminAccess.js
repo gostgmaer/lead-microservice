@@ -1,6 +1,6 @@
 /**
  * Admin access middleware.
- * Must run AFTER authMiddleware (req.user must be populated).
+ * Must run AFTER authenticate (req.user must be populated).
  * Grants access only to roles: admin | super_admin.
  */
 const ADMIN_ROLES = ['admin', 'super_admin'];
@@ -12,4 +12,4 @@ function adminAccess(req, res, next) {
   next();
 }
 
-module.exports = adminAccess;
+export default adminAccess;

@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
-const config = require('./setting');
-const logger = require('../middleware/logger');
+import mongoose from 'mongoose';
+import config from './setting.js';
+import logger from '../middleware/logger.js';
 
 let isConnected = false;
 
@@ -30,4 +30,4 @@ mongoose.connection.on('disconnected', () => {
   logger.warn('[DB] MongoDB disconnected');
 });
 
-module.exports = { connectDB };
+export { connectDB };

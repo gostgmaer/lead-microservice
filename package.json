@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Enterprise-grade Contact & Lead Collection Microservice",
   "main": "server.js",
+  "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
@@ -32,8 +33,10 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
     "node-cron": "^3.0.3",
+    "pdfkit": "^0.19.1",
     "uuid": "^9.0.1",
-    "winston": "^3.13.1"
+    "winston": "^3.13.1",
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

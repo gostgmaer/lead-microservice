@@ -3,13 +3,12 @@
  * Connects to DB, starts scheduler, and starts the HTTP server.
  */
 
-require('dotenv').config();
-
-const app = require('./app');
-const { connectDB } = require('./src/config/db');
-const { startScheduler } = require('./src/services/leadSchedulerService');
-const logger = require('./src/middleware/logger');
-const config = require('./src/config/setting');
+import 'dotenv/config';
+import app from './app.js';
+import { connectDB } from './src/config/db.js';
+import { startScheduler } from './src/services/leadSchedulerService.js';
+import logger from './src/middleware/logger.js';
+import config from './src/config/setting.js';
 
 const PORT = config.app.port;
 

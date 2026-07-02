@@ -2,33 +2,52 @@
  * Lead Email Service
  *
  * RULES:
- * 1. This is the ONLY file in the microservice that calls POST /send-email.
- * 2. All email functions return a Promise — callers MUST NOT await them (fire-and-forget).
- * 3. _dispatch already logs all errors internally — callers do not need to handle errors.
+ * 1. This is the ONLY file that calls POST {EMAIL_SERVICE_URL}/send-email for lead templates.
+ * 2. All functions return a Promise — callers MUST NOT await them (fire-and-forget).
+ * 3. _dispatch logs errors internally — callers do not need to handle errors.
  */
+import { apiCall } from '../lib/axiosCall.js';
+import logger from '../utils/logger.js';
+import { config } from '../config/index.js';
+import {
+  LEAD_RECEIVED, LEAD_ADMIN_NOTIFICATION, LEAD_CONTACT_REPLY, LEAD_STATUS_CHANGED,
+  LEAD_FOLLOW_UP_REMINDER, PROJECT_PROPOSAL_EMAIL, LEAD_PROPOSAL_ACCEPTED,
+  LEAD_ADMIN_PROPOSAL_ACCEPTED, LEAD_PROPOSAL_DECLINED_ACK, LEAD_ADMIN_PROPOSAL_DECLINED,
+  LEAD_PROPOSAL_EXPIRING, LEAD_PROPOSAL_EXPIRED, LEAD_CONTRACT_SENT, LEAD_CONTRACT_SIGNED,
+  LEAD_WON_NOTIFICATION, LEAD_LOST_NOTIFICATION,
+} from '../email/leadEmailTemplate.js';
 
-const { apiCall } = require('../lib/axiosCall');
-const logger = require('../middleware/logger');
-const config = require('../config/setting');
-
-const URL = config.email.serviceUrl;
-const KEY = config.email.apiKey;
+const URL   = config.email.serviceUrl;
+const KEY   = config.emailApiKey;
 const ADMIN = config.email.adminEmail;
-const DASH = config.dashboard.url;
+const DASH  = config.dashboard.url;
+const TENANT = config.tenantRef;
+const APP_NAME = config.app.name || 'EasyDev';
+const APP_URL  = config.app.frontendUrl;
 
-/**
- * Internal dispatcher — the ONE place /send-email is called.
- * @returns {Promise<void>}
- */
 function _dispatch(to, template, data) {
+  const idempotencyKey = `${template.toLowerCase()}-${TENANT}-${to}`;
+  logger.info(`[leadEmail] Dispatching ${template} to ${to}`, { idempotencyKey });
   return apiCall(
-    `${URL}/send-email`,
+    `${URL}/email/send`,
     { method: 'POST', data: { to, template, data } },
-    { headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' } }
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(KEY ? { 'x-api-key': KEY } : {}),
+        'x-tenant-id': TENANT,
+        'x-app-name': APP_NAME,
+        'x-app-url': APP_URL,
+        'x-path': '/dashboard',
+        'x-idempotency-key': idempotencyKey,
+      },
+    }
   )
     .then((result) => {
       if (result?.error) {
         logger.warn(`[leadEmail] ${template} → ${to} failed: ${result.message}`);
+      } else {
+        logger.info(`[leadEmail] ${template} successfully handed off to email service for ${to}`);
       }
     })
     .catch((err) => {
@@ -38,247 +57,149 @@ function _dispatch(to, template, data) {
 
 // ─── Inbound / Submission ─────────────────────────────────────────────────────
 
-function sendLeadReceived(lead) {
-  return _dispatch(lead.email, 'LEAD_RECEIVED', {
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    leadNumber: lead.leadNumberFormatted,
-    subject: lead.subject,
-    projectType: lead.projectType,
-    budget: lead.budget,
-    timeline: lead.timeline,
+export function sendLeadReceived(lead) {
+  return _dispatch(lead.email, LEAD_RECEIVED, {
+    firstName: lead.firstName, lastName: lead.lastName,
+    leadNumber: lead.leadNumberFormatted, subject: lead.subject,
+    projectType: lead.projectType || 'other', budget: lead.budget, timeline: lead.timeline,
   });
 }
 
-function sendAdminLeadNotification(lead) {
-  return _dispatch(ADMIN, 'LEAD_ADMIN_NOTIFICATION', {
+export function sendAdminLeadNotification(lead) {
+  return _dispatch(ADMIN, LEAD_ADMIN_NOTIFICATION, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    phone: lead.phone,
-    company: lead.company,
-    subject: lead.subject,
-    message: lead.message,
-    projectType: lead.projectType,
-    budget: lead.budget,
-    timeline: lead.timeline,
-    source: lead.source,
-    priority: lead.priority,
-    score: lead.score,
-    ipAddress: lead.ipAddress,
-    submittedAt: lead.createdAt,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, phone: lead.phone, company: lead.company,
+    subject: lead.subject, message: lead.message,
+    projectType: lead.projectType || 'other', budget: lead.budget, timeline: lead.timeline,
+    source: lead.source, priority: lead.priority, score: lead.score,
+    ipAddress: lead.ipAddress, submittedAt: lead.createdAt,
     reviewUrl: `${DASH}/leads/${lead._id}`,
   });
 }
 
 // ─── Communication ────────────────────────────────────────────────────────────
 
-function sendContactReply(lead, { subject, message, agentName, agentEmail, agentTitle }) {
-  return _dispatch(lead.email, 'LEAD_CONTACT_REPLY', {
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    leadNumber: lead.leadNumberFormatted,
-    subject,
-    message,
-    agentName,
-    agentEmail,
-    agentTitle,
+export function sendContactReply(lead, { subject, message, agentName, agentEmail, agentTitle }) {
+  return _dispatch(lead.email, LEAD_CONTACT_REPLY, {
+    firstName: lead.firstName, lastName: lead.lastName,
+    leadNumber: lead.leadNumberFormatted, subject, message,
+    agentName, agentEmail, agentTitle,
   });
 }
 
-function sendStatusChanged(lead, { oldStatus, newStatus, note, agentName, ctaUrl }) {
-  return _dispatch(lead.email, 'LEAD_STATUS_CHANGED', {
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    leadNumber: lead.leadNumberFormatted,
-    oldStatus,
-    newStatus,
-    note,
-    agentName,
-    ctaUrl,
+export function sendStatusChanged(lead, { oldStatus, newStatus, note, agentName, ctaUrl }) {
+  return _dispatch(lead.email, LEAD_STATUS_CHANGED, {
+    firstName: lead.firstName, lastName: lead.lastName,
+    leadNumber: lead.leadNumberFormatted, oldStatus, newStatus, note, agentName, ctaUrl,
   });
 }
 
-function sendFollowUpReminder(agentEmail, lead, agent, { followUpDate, daysSinceLastContact, notes, reviewUrl }) {
-  return _dispatch(agentEmail, 'LEAD_FOLLOW_UP_REMINDER', {
+export function sendFollowUpReminder(agentEmail, lead, agent, { followUpDate, daysSinceLastContact, notes, reviewUrl }) {
+  return _dispatch(agentEmail, LEAD_FOLLOW_UP_REMINDER, {
     agentName: agent?.firstName || agentEmail,
     leadNumber: lead.leadNumberFormatted,
-    leadFirstName: lead.firstName,
-    leadLastName: lead.lastName,
-    leadEmail: lead.email,
-    leadCompany: lead.company,
-    priority: lead.priority,
-    followUpDate,
-    daysSinceLastContact,
-    notes,
-    reviewUrl,
+    leadFirstName: lead.firstName, leadLastName: lead.lastName,
+    leadEmail: lead.email, leadCompany: lead.company,
+    priority: lead.priority, followUpDate, daysSinceLastContact, notes, reviewUrl,
   });
 }
 
 // ─── Proposal Lifecycle ───────────────────────────────────────────────────────
 
-function sendProposalEmail(lead, { proposalNumber, proposalUrl, quotedAmount, validUntil, message, attachmentName }) {
-  return _dispatch(lead.email, 'PROJECT_PROPOSAL_EMAIL', {
+export function sendProposalEmail(lead, { proposalNumber, proposalUrl, quotedAmount, validUntil, message, attachmentName }) {
+  return _dispatch(lead.email, PROJECT_PROPOSAL_EMAIL, {
     clientName: `${lead.firstName} ${lead.lastName}`,
-    projectName: lead.subject,
-    proposalUrl,
-    proposalNumber,
+    projectName: lead.subject, proposalUrl, proposalNumber,
     issueDate: new Date().toLocaleDateString(),
-    validUntil,
-    quotedAmount,
-    message,
-    attachmentName,
+    validUntil, quotedAmount, message, attachmentName,
   });
 }
 
-function sendProposalAccepted(lead, agentName) {
-  return _dispatch(lead.email, 'LEAD_PROPOSAL_ACCEPTED', {
-    firstName: lead.firstName,
-    leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject,
-    quotedAmount: lead.quotedAmount,
-    quotedCurrency: lead.quotedCurrency,
-    agentName,
+export function sendProposalAccepted(lead, agentName) {
+  return _dispatch(lead.email, LEAD_PROPOSAL_ACCEPTED, {
+    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+    projectName: lead.subject, quotedAmount: lead.quotedAmount,
+    quotedCurrency: lead.quotedCurrency, agentName,
   });
 }
 
-function sendAdminProposalAccepted(lead, reviewUrl) {
-  return _dispatch(ADMIN, 'LEAD_ADMIN_PROPOSAL_ACCEPTED', {
+export function sendAdminProposalAccepted(lead, reviewUrl) {
+  return _dispatch(ADMIN, LEAD_ADMIN_PROPOSAL_ACCEPTED, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    company: lead.company,
-    projectName: lead.subject,
-    quotedAmount: lead.quotedAmount,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, company: lead.company,
+    projectName: lead.subject, quotedAmount: lead.quotedAmount, reviewUrl,
   });
 }
 
-function sendProposalDeclinedAck(lead, agentName) {
-  return _dispatch(lead.email, 'LEAD_PROPOSAL_DECLINED_ACK', {
-    firstName: lead.firstName,
-    leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject,
-    agentName,
-    supportEmail: ADMIN,
+export function sendProposalDeclinedAck(lead, agentName) {
+  return _dispatch(lead.email, LEAD_PROPOSAL_DECLINED_ACK, {
+    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+    projectName: lead.subject, agentName, supportEmail: ADMIN,
   });
 }
 
-function sendAdminProposalDeclined(lead, { declinedReason, reviewUrl }) {
-  return _dispatch(ADMIN, 'LEAD_ADMIN_PROPOSAL_DECLINED', {
+export function sendAdminProposalDeclined(lead, { declinedReason, reviewUrl }) {
+  return _dispatch(ADMIN, LEAD_ADMIN_PROPOSAL_DECLINED, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    company: lead.company,
-    declinedReason,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, company: lead.company, declinedReason, reviewUrl,
   });
 }
 
-function sendProposalExpiringSoon(lead, { proposalNumber, validUntil, daysRemaining, reviewUrl }) {
-  return _dispatch(ADMIN, 'LEAD_PROPOSAL_EXPIRING', {
+export function sendProposalExpiringSoon(lead, { proposalNumber, validUntil, daysRemaining, reviewUrl }) {
+  return _dispatch(ADMIN, LEAD_PROPOSAL_EXPIRING, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    proposalNumber,
-    validUntil,
-    daysRemaining,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, proposalNumber, validUntil, daysRemaining, reviewUrl,
   });
 }
 
-function sendProposalExpired(lead, { proposalNumber, expiredAt, reviewUrl }) {
-  return _dispatch(ADMIN, 'LEAD_PROPOSAL_EXPIRED', {
+export function sendProposalExpired(lead, { proposalNumber, expiredAt, reviewUrl }) {
+  return _dispatch(ADMIN, LEAD_PROPOSAL_EXPIRED, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    proposalNumber,
-    expiredAt,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, proposalNumber, expiredAt, reviewUrl,
   });
 }
 
 // ─── Contract Lifecycle ───────────────────────────────────────────────────────
 
-function sendContractEmail(lead, { contractUrl, message, agentName }) {
-  return _dispatch(lead.email, 'LEAD_CONTRACT_SENT', {
-    firstName: lead.firstName,
-    leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject,
-    contractUrl,
-    message,
-    agentName,
+export function sendContractEmail(lead, { contractUrl, message, agentName }) {
+  return _dispatch(lead.email, LEAD_CONTRACT_SENT, {
+    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+    projectName: lead.subject, contractUrl, message, agentName,
   });
 }
 
-function sendContractSigned(lead, agentName) {
-  _dispatch(lead.email, 'LEAD_CONTRACT_SIGNED', {
-    firstName: lead.firstName,
-    leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject,
-    contractSignedAt: lead.contractSignedAt,
-    agentName,
+export function sendContractSigned(lead, agentName) {
+  _dispatch(lead.email, LEAD_CONTRACT_SIGNED, {
+    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+    projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
   });
-  _dispatch(ADMIN, 'LEAD_CONTRACT_SIGNED', {
-    firstName: lead.firstName,
-    leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject,
-    contractSignedAt: lead.contractSignedAt,
-    agentName,
+  _dispatch(ADMIN, LEAD_CONTRACT_SIGNED, {
+    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+    projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
   });
 }
 
 // ─── Deal Outcome ─────────────────────────────────────────────────────────────
 
-function sendWonNotification(lead, { agentName, reviewUrl }) {
-  return _dispatch(ADMIN, 'LEAD_WON_NOTIFICATION', {
+export function sendWonNotification(lead, { agentName, reviewUrl }) {
+  return _dispatch(ADMIN, LEAD_WON_NOTIFICATION, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    company: lead.company,
-    projectName: lead.subject,
-    quotedAmount: lead.quotedAmount,
-    quotedCurrency: lead.quotedCurrency,
-    closedAt: new Date(),
-    agentName,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, company: lead.company, projectName: lead.subject,
+    quotedAmount: lead.quotedAmount, quotedCurrency: lead.quotedCurrency,
+    closedAt: new Date(), agentName, reviewUrl,
   });
 }
 
-function sendLostNotification(lead, { lostReason, agentName, reviewUrl }) {
-  return _dispatch(ADMIN, 'LEAD_LOST_NOTIFICATION', {
+export function sendLostNotification(lead, { lostReason, agentName, reviewUrl }) {
+  return _dispatch(ADMIN, LEAD_LOST_NOTIFICATION, {
     leadNumber: lead.leadNumberFormatted,
-    firstName: lead.firstName,
-    lastName: lead.lastName,
-    email: lead.email,
-    company: lead.company,
-    lostReason,
-    agentName,
-    reviewUrl,
+    firstName: lead.firstName, lastName: lead.lastName,
+    email: lead.email, company: lead.company, lostReason, agentName, reviewUrl,
   });
 }
-
-module.exports = {
-  sendLeadReceived,
-  sendAdminLeadNotification,
-  sendContactReply,
-  sendStatusChanged,
-  sendFollowUpReminder,
-  sendProposalEmail,
-  sendProposalAccepted,
-  sendAdminProposalAccepted,
-  sendProposalDeclinedAck,
-  sendAdminProposalDeclined,
-  sendProposalExpiringSoon,
-  sendProposalExpired,
-  sendContractEmail,
-  sendContractSigned,
-  sendWonNotification,
-  sendLostNotification,
-};

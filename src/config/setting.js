@@ -1,8 +1,8 @@
 /**
  * Application configuration
- * Reads from process.env — ensure .env is loaded before requiring this file
+ * Reads from process.env — ensure dotenv/config is imported before using this config
  */
-require('dotenv').config();
+import 'dotenv/config';
 
 const config = {
 	app: {
@@ -19,6 +19,10 @@ const config = {
 	},
 	auth: { serviceUrl: process.env.AUTH_SERVICE_URL || "http://localhost:4002" },
 	dashboard: { url: process.env.DASHBOARD_URL || "http://localhost:3000" },
+	fileUpload: {
+		serviceUrl: process.env.FILE_UPLOAD_SERVICE_URL || '',
+		gatewayHmacSecret: process.env.FILE_UPLOAD_HMAC_SECRET || '',
+	},
 	upload: {
 		maxSizeMb: parseInt(process.env.LEAD_FILE_MAX_SIZE_MB, 10) || 10,
 		allowedTypes: (process.env.LEAD_FILE_ALLOWED_TYPES || "pdf,doc,docx,xls,xlsx,png,jpg,jpeg,gif,zip,csv").split(","),
@@ -30,9 +34,6 @@ const config = {
 		).split(","),
 	},
 	cors: { origins: (process.env.ALLOWED_ORIGINS || "http://localhost:3000").split(",") },
-	// Tenant configuration.
-	// TENANCY_ENABLED=true  → x-tenant-id is enforced on every request (or DEFAULT_TENANT_ID fallback).
-	// TENANCY_ENABLED=false → tenant is optional; services work without tenant scoping.
 	tenant: {
 		enabled: process.env.TENANCY_ENABLED === "true",
 		defaultTenantId: process.env.DEFAULT_TENANT_ID ? process.env.DEFAULT_TENANT_ID.trim() : null,
@@ -40,4 +41,4 @@ const config = {
 	redis: { enabled: process.env.REDIS_ENABLED === "true", url: process.env.REDIS_URL || null },
 };
 
-module.exports = config;
+export default config;
