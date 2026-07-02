@@ -1,0 +1,38 @@
+# =============================================================================
+# Standalone lead-microservice deployment — no platform networks.
+#
+# The service is fully self-contained: MongoDB is remote (Azure Cosmos URI in
+# .env), IAM JWTs are verified locally (JWT_PUBLIC_KEY / JWT_SECRET in .env),
+# and Redis is optional (REDIS_ENABLED=false falls back to in-memory).
+#
+#   docker compose up -d --build
+#
+# Consumers (e.g. the gateway) reach it by URL only — http://<host>:4003
+# locally, or whatever public URL this is deployed behind. Nothing here joins
+# the easydev shared docker networks on purpose.
+# =============================================================================
+
+services:
+  lead-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lead-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # NOTE: hardcoded, not ${VAR:-default} — compose auto-loads ./.env for
+      # interpolation, so a default would silently be replaced by any
+      # same-named .env value. Everything else (MONGODB_URI, JWT_*, email
+      # keys) deliberately flows through from .env untouched.
+      NODE_ENV: development
+      PORT: 4003
+    ports:
+      - "4003:4003"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:4003/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      start_interval: 5s
