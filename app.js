@@ -14,10 +14,23 @@ import { randomUUID } from 'crypto';
 
 import config from './src/config/setting.js';
 import { notFound, errorHandler } from './src/middleware/errorHandler.js';
+import { connectDB } from './src/config/db.js';
+import logger from './src/middleware/logger.js';
 import leadRoutes from './src/routes/leads.js';
 import newsletterRoutes from './src/routes/newsletter.js';
 import uploadRoutes from './src/routes/upload.js';
 import calculatorRoutes from './src/routes/calculator.js';
+
+// server.js (traditional/local start) also calls connectDB() and exits on
+// failure. On Vercel, app.js is the actual serverless entry point (default
+// export below) — server.js is never executed — so the connection must be
+// established here too. connectDB() is idempotent (guarded by isConnected),
+// so this is a no-op on warm invocations. Failure must NOT crash the
+// process (a shared serverless container would take down concurrent
+// requests); routes fall back to reporting a degraded health check instead.
+connectDB().catch((err) => {
+  logger.error('[app] Initial database connection failed', err);
+});
 
 const app = express();
 
