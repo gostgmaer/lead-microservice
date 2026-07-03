@@ -13,7 +13,12 @@ import config from './src/config/setting.js';
 const PORT = config.app.port;
 
 async function start() {
-  await connectDB();
+  try {
+    await connectDB();
+  } catch (err) {
+    logger.error('[server] Failed to connect to database, exiting', err);
+    process.exit(1);
+  }
 
   const server = app.listen(PORT, () => {
     logger.info(`[server] Lead Microservice running on port ${PORT} (${config.app.env})`);

@@ -21,7 +21,7 @@ async function connectDB() {
     logger.info('[DB] MongoDB connected');
   } catch (err) {
     logger.error('[DB] Connection failed:', err.message);
-    process.exit(1);
+    throw err;
   }
 }
 
