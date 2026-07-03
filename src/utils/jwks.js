@@ -39,7 +39,12 @@ async function refresh() {
         return;
       }
       const body = await res.json();
-      for (const jwk of body?.keys ?? []) {
+      // IAM wraps every response in { success, data, message, timestamp } —
+      // the raw JWK set lives at body.data.keys, not body.keys. This silently
+      // caused every JWKS fetch to iterate an empty array, so no key was ever
+      // cached and verification always fell through to the (possibly stale)
+      // static JWT_PUBLIC_KEY.
+      for (const jwk of body?.data?.keys ?? body?.keys ?? []) {
         if (!jwk.kid) continue;
         try {
           keys.set(jwk.kid, createPublicKey({ key: jwk, format: 'jwk' }));
