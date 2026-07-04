@@ -222,7 +222,7 @@ export const healthCheck = catchAsync(async (req, res) => {
   emailStatus = result.error ? 'degraded' : 'ok';
   return res.status(200).json({
     status: 'ok',
-    service: 'web-agency-backend-api',
+    service: 'lead-microservice',
     timestamp: new Date().toISOString(),
     dependencies: { database: dbStatus, emailService: emailStatus },
   });
