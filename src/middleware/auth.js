@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import config from '../config/setting.js';
 import logger from '../utils/logger.js';
+import { getSessionContext, isIntrospectionEnabled } from '../utils/iamIntrospection.js';
 
 // Verify an IAM-issued access token locally — RS256 with IAM's public key,
 // falling back to the shared HS256 secret during the platform's transition
@@ -45,13 +46,30 @@ export const authenticate = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Invalid or expired token' });
     }
 
-    const roles = decoded.roles || (decoded.role ? [decoded.role] : []);
+    let roles = decoded.roles || (decoded.role ? [decoded.role] : []);
+    let permissions = decoded.permissions || [];
+
+    // SECURITY (X-C6): the JWT no longer carries `permissions` at all (see
+    // getSessionContext's own comment), so without this, every permission
+    // check below would always see an empty set regardless of the caller's
+    // actual role. Also gives instant revocation: a logged-out session's
+    // introspection lookup comes back inactive and the request is rejected
+    // here rather than continuing on a technically-still-valid signature.
+    if (decoded.sessionId && isIntrospectionEnabled()) {
+      const sessionContext = await getSessionContext(decoded.sessionId);
+      if (!sessionContext) {
+        return res.status(401).json({ success: false, message: 'Session has been revoked or expired' });
+      }
+      roles = sessionContext.roles || roles;
+      permissions = sessionContext.permissions || permissions;
+    }
+
     req.user = {
       id: decoded.sub || decoded.id,
       email: decoded.email || "",
       role: decoded.role || roles[0],
       roles,
-      permissions: decoded.permissions || [],
+      permissions,
       tenantId: decoded.tenantId || decoded.tenantSlug || tenantId,
       sessionId: decoded.sessionId,
     };

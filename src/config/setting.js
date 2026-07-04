@@ -36,6 +36,14 @@ const config = {
 		jwtHsSecret: (process.env.JWT_SECRET || "").trim() || null,
 		jwtIssuer: (process.env.JWT_ISSUER || "").trim() || null,
 		jwtAudience: (process.env.JWT_AUDIENCE || "").trim() || null,
+		// Session-revocation + permissions introspection (X-C6) — the JWT no
+		// longer carries a `permissions` array (lean-JWT design), so this is
+		// the only way this service ever learns what the caller can actually
+		// do. Disabled (permissions always empty) until this key is set —
+		// matches payment-microservice/ai-comm's IamIntrospectionService.
+		introspectionApiKey: (process.env.IAM_INTROSPECTION_API_KEY || "").trim() || null,
+		introspectionCacheTtlMs: parseInt(process.env.IAM_INTROSPECTION_CACHE_TTL_MS, 10) || 30000,
+		introspectionFailOpen: process.env.IAM_INTROSPECTION_FAIL_OPEN !== "false",
 	},
 	dashboard: { url: process.env.DASHBOARD_URL || "http://localhost:3000" },
 	fileUpload: {
