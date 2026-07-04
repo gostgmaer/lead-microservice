@@ -27,7 +27,11 @@ const config = {
 			const raw = process.env.JWT_PUBLIC_KEY;
 			if (!raw || !String(raw).trim()) return null;
 			const trimmed = String(raw).trim();
-			return trimmed.startsWith("-----") ? trimmed : Buffer.from(trimmed, "base64").toString("utf8");
+			const pem = trimmed.startsWith("-----") ? trimmed : Buffer.from(trimmed, "base64").toString("utf8");
+			// Some env transports (Vercel included) flatten a multi-line PEM's real
+			// newlines into literal "\n" text; crypto's PEM parser needs actual
+			// newline bytes, so restore them when none are present already.
+			return pem.includes("\n") ? pem : pem.replace(/\\n/g, "\n");
 		})(),
 		jwtHsSecret: (process.env.JWT_SECRET || "").trim() || null,
 		jwtIssuer: (process.env.JWT_ISSUER || "").trim() || null,
