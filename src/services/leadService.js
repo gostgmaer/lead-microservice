@@ -9,6 +9,7 @@ import { config } from '../config/index.js';
 import crypto from 'crypto';
 import { buildProposalPdfBuffer } from '../utils/proposalPdf.js';
 import { uploadFile } from '../utils/storage.js';
+import logger from '../utils/logger.js';
 
 const DASH = config.dashboard.url;
 
@@ -23,10 +24,10 @@ async function _generateAndStoreProposalPdf(proposalData, leadNumber, req) {
 
 export const VALID_TRANSITIONS = {
   new:               ['contacted', 'qualified', 'disqualified', 'on_hold', 'archived'],
-  contacted:         ['qualified', 'disqualified', 'proposal_draft', 'on_hold', 'archived'],
-  qualified:         ['proposal_draft', 'disqualified', 'on_hold', 'archived'],
+  contacted:         ['qualified', 'proposal_draft', 'proposal_sent', 'quotation_sent', 'disqualified', 'on_hold', 'archived'],
+  qualified:         ['proposal_draft', 'proposal_sent', 'quotation_sent', 'disqualified', 'on_hold', 'archived'],
   disqualified:      [],
-  proposal_draft:    ['proposal_sent', 'archived'],
+  proposal_draft:    ['proposal_sent', 'quotation_sent', 'archived'],
   proposal_sent:     ['proposal_sent', 'proposal_viewed', 'proposal_accepted', 'proposal_declined', 'proposal_revised', 'proposal_expired', 'negotiation', 'on_hold'],
   proposal_viewed:   ['proposal_accepted', 'proposal_declined', 'proposal_revised', 'negotiation', 'on_hold'],
   proposal_accepted: ['quotation_sent', 'contract_sent', 'negotiation', 'won'],
@@ -35,7 +36,7 @@ export const VALID_TRANSITIONS = {
   proposal_expired:  ['proposal_revised', 'lost', 'on_hold'],
   quotation_sent:    ['quotation_sent', 'invoice_sent', 'contract_sent', 'negotiation', 'won', 'lost'],
   invoice_sent:      ['invoice_sent', 'contract_sent', 'won', 'lost'],
-  negotiation:       ['contract_sent', 'won', 'lost', 'on_hold'],
+  negotiation:       ['proposal_sent', 'quotation_sent', 'contract_sent', 'won', 'lost', 'on_hold'],
   contract_sent:     ['contract_signed', 'lost', 'on_hold'],
   contract_signed:   ['won'],
   won:               ['archived'],
@@ -49,17 +50,32 @@ export const VALID_TRANSITIONS = {
  */
 export async function updateLeadStatus(lead, newStatus, note = null, changedBy = null, agentName = '') {
   const current = lead.status;
+  let targetStatus = newStatus;
 
-  if (current !== newStatus) {
+  // If trying to contact lead but lead is already in an advanced status,
+  // do not downgrade the status, but still run contacted side-effects.
+  if (newStatus === 'contacted') {
+    const advancedStatuses = [
+      'qualified', 'proposal_draft', 'proposal_sent', 'proposal_viewed',
+      'proposal_accepted', 'proposal_declined', 'proposal_revised', 'proposal_expired',
+      'quotation_sent', 'invoice_sent', 'negotiation', 'contract_sent', 'contract_signed',
+      'won'
+    ];
+    if (advancedStatuses.includes(current)) {
+      targetStatus = current;
+    }
+  }
+
+  if (current !== targetStatus) {
     const allowed = VALID_TRANSITIONS[current] || [];
-    if (!allowed.includes(newStatus)) {
-      throw new AppError(`Invalid status transition: ${current} → ${newStatus}`, 422, 'UNPROCESSABLE_ENTITY');
+    if (!allowed.includes(targetStatus)) {
+      throw new AppError(`Invalid status transition: ${current} → ${targetStatus}`, 422, 'UNPROCESSABLE_ENTITY');
     }
   }
 
   const now = new Date();
   const reviewUrl = `${DASH}/leads/${lead._id}`;
-  lead.status = newStatus;
+  lead.status = targetStatus;
   lead.updatedBy = changedBy;
 
   switch (newStatus) {
@@ -136,11 +152,11 @@ export async function updateLeadStatus(lead, newStatus, note = null, changedBy =
       break;
   }
 
-  lead.statusHistory.push({ status: newStatus, pipelineStage: lead.pipelineStage, changedBy, changedAt: now, note });
+  lead.statusHistory.push({ status: targetStatus, pipelineStage: lead.pipelineStage, changedBy, changedAt: now, note });
   await lead.save();
 
   // Fire-and-forget emails
-  switch (newStatus) {
+  switch (targetStatus) {
     case 'proposal_accepted':
       leadEmail.sendProposalAccepted(lead, agentName);
       leadEmail.sendAdminProposalAccepted(lead, reviewUrl);
@@ -229,7 +245,8 @@ export async function updateLead(id, tenantId, updates, updatedBy) {
   }
 
   // 2. Handle internal notes if provided
-  if (internalNotes && internalNotes !== lead.internalNotes) {
+  const lastInternalNote = lead.notes.filter((n) => n.isInternal).slice(-1)[0]?.content;
+  if (internalNotes && internalNotes !== lastInternalNote) {
     lead.notes.push({ content: internalNotes, isInternal: true, createdBy: updatedBy, createdAt: new Date() });
   }
 

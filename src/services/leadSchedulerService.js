@@ -4,6 +4,7 @@
  */
 import cron from 'node-cron';
 import Lead from '../models/Lead.js';
+import User from '../models/User.js';
 import * as leadService from './leadService.js';
 import * as leadEmail from './leadEmailService.js';
 import logger from '../utils/logger.js';
