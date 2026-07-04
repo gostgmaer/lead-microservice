@@ -1,0 +1,249 @@
+name: Lead Microservice Pipeline
+
+# Replaces this repo's previous CD gap: only auto-tag-on-main.yml existed
+# (version-bumps a tag on every push to main with no build, test, or deploy
+# step behind it at all). Mirrors the working pipeline pattern from
+# payment-microservice/cd.yml and file-upload-service/ci-cd.yml (both already
+# read in full) for fleet-wide consistency, adapted for this repo's actual
+# stack (Express/ESM, npm, no Prisma, no build step, eslint but no test suite).
+
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "Manual run mode (deploy-only reuses the latest image already in GHCR)"
+        required: true
+        default: "build-and-deploy"
+        type: choice
+        options:
+          - build-and-deploy
+          - build-only
+          - deploy-only
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NEW_IMAGE: easydev-lead-microservice:latest
+  GHCR_PACKAGE: easydev-lead-microservice
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1: Detect changes
+  # ---------------------------------------------------------------------------
+  changes:
+    name: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.filter.outputs.code }}
+      dependencies_changed: ${{ steps.filter.outputs.dependencies }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'server.js'
+            dependencies:
+              - 'package.json'
+              - 'package-lock.json'
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: Code quality + vulnerability (merged, runs only when code/deps changed)
+  # ---------------------------------------------------------------------------
+  quality-and-security:
+    name: quality-and-security
+    if: needs.changes.outputs.code_changed == 'true' || needs.changes.outputs.dependencies_changed == 'true' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_mode != 'deploy-only')
+    runs-on: ubuntu-latest
+    needs: changes
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check
+        if: needs.changes.outputs.code_changed == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          find src -name '*.js' -print0 | xargs -0 -n1 node --check
+          node --check server.js
+
+      - name: Lint
+        if: needs.changes.outputs.code_changed == 'true' || github.event_name == 'workflow_dispatch'
+        run: npm run lint
+
+      # No test script exists in this repo yet (package.json has no "test"
+      # entry) — nothing to run here until one is added.
+
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level critical || true
+
+      - name: Trivy filesystem scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          vuln-type: library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: '0'
+          cache-dir: .trivy-cache
+
+  # ---------------------------------------------------------------------------
+  # Stage 3: Build and push (always runs; GHA cache keeps it fast when unchanged)
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: build-and-push
+    runs-on: ubuntu-latest
+    needs: [changes, quality-and-security]
+    if: |
+      always() &&
+      (needs.quality-and-security.result == 'success' || needs.quality-and-security.result == 'skipped') &&
+      (
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.run_mode != 'deploy-only') ||
+        (
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+          (needs.changes.outputs.code_changed == 'true' || needs.changes.outputs.dependencies_changed == 'true')
+        )
+      )
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: ${{ env.NEW_IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy image scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.NEW_IMAGE }}
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: '0'
+          cache-dir: .trivy-cache
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image tags to GHCR
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GHCR_PACKAGE: ${{ env.GHCR_PACKAGE }}
+        run: |
+          set -euo pipefail
+
+          owner_lower="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          package_lower="$(echo "${GHCR_PACKAGE}" | tr '[:upper:]' '[:lower:]')"
+          ghcr_image="ghcr.io/${owner_lower}/${package_lower}"
+
+          branch_slug="$(echo "${GITHUB_REF#refs/heads/}" | tr '/' '-' | tr '[:upper:]' '[:lower:]')"
+          version_tag="${branch_slug}-build-${GITHUB_RUN_NUMBER}"
+
+          docker tag "${NEW_IMAGE}" "${ghcr_image}:${version_tag}"
+          docker push "${ghcr_image}:${version_tag}"
+
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            docker tag "${NEW_IMAGE}" "${ghcr_image}:latest"
+            docker push "${ghcr_image}:latest"
+          fi
+
+          echo "Published ${ghcr_image}:${version_tag}"
+
+  # ---------------------------------------------------------------------------
+  # Stage 4: Create GitHub release and git tag
+  # Deployment itself is owned entirely by easydev-infra's manual-only
+  # deploy-infra.yml (workflow_dispatch) — no repository_dispatch trigger here,
+  # matching the confirmed no-op fate of that mechanism in the sibling
+  # payment-microservice/file-upload-service pipelines.
+  # ---------------------------------------------------------------------------
+  release:
+    name: release
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.build-and-push.result == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fetch all tags
+        run: git fetch --tags --force
+
+      - name: Calculate next version
+        shell: bash
+        run: |
+          set -euo pipefail
+          LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+          if [[ -z "$LAST_TAG" ]]; then
+            LAST_TAG="v0.0.0"
+          fi
+          VERSION="${LAST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          MAJOR="${MAJOR:-0}"
+          MINOR="${MINOR:-0}"
+          PATCH="${PATCH:-0}"
+          NEXT_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "NEW_TAG=${NEXT_TAG}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.NEW_TAG }}
+          name: ${{ env.NEW_TAG }}
+          body: |
+            **Commit:** `${{ github.sha }}`
+            **Docker image:** `ghcr.io/${{ github.repository_owner }}/${{ env.GHCR_PACKAGE }}:main-build-${{ github.run_number }}`
+          make_latest: true
