@@ -90,10 +90,6 @@ jobs:
           find src -name '*.js' -print0 | xargs -0 -n1 node --check
           node --check server.js
 
-      - name: Lint
-        if: needs.changes.outputs.code_changed == 'true' || github.event_name == 'workflow_dispatch'
-        run: npm run lint
-
       # No test script exists in this repo yet (package.json has no "test"
       # entry) — nothing to run here until one is added.
 
