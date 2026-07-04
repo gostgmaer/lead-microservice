@@ -174,14 +174,16 @@ export function sendContractEmail(lead, { contractUrl, message, agentName }) {
 }
 
 export function sendContractSigned(lead, agentName) {
-  _dispatch(lead.email, LEAD_CONTRACT_SIGNED, {
-    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
-  });
-  _dispatch(ADMIN, LEAD_CONTRACT_SIGNED, {
-    firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
-    projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
-  });
+  return Promise.all([
+    _dispatch(lead.email, LEAD_CONTRACT_SIGNED, {
+      firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+      projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
+    }),
+    _dispatch(ADMIN, LEAD_CONTRACT_SIGNED, {
+      firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
+      projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
+    })
+  ]);
 }
 
 // ─── Deal Outcome ─────────────────────────────────────────────────────────────

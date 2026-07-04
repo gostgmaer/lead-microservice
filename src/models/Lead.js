@@ -116,7 +116,7 @@ const leadSchema = new mongoose.Schema(
 
     attachments: { type: [attachmentSchema], default: [] },
 
-    assignedTo: { type: String },
+    assignedTo: { type: String, ref: 'User' },
     assignedAt: { type: Date },
     ownedBy:    { type: String },
 
@@ -206,9 +206,18 @@ leadSchema.index(
   { name: 'lead_text_search' }
 );
 
+// ─── Format Helper ────────────────────────────────────────────────────────────
+export function formatLeadNumber(leadNumber, createdAt) {
+  const date = createdAt ? new Date(createdAt) : new Date();
+  const yyyy = date.getFullYear();
+  const dd = String(date.getDate()).padStart(2, '0');
+  const num = String(leadNumber).padStart(5, '0');
+  return `EASY-${yyyy}-${dd}-${num}`;
+}
+
 // ─── Virtuals ─────────────────────────────────────────────────────────────────
 leadSchema.virtual('leadNumberFormatted').get(function () {
-  return 'L-' + String(this.leadNumber).padStart(5, '0');
+  return formatLeadNumber(this.leadNumber, this.createdAt);
 });
 leadSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
@@ -276,13 +285,34 @@ leadSchema.statics.searchLeads = async function ({ tenantId, q, status, priority
     if (dateTo) query.createdAt.$lte = new Date(dateTo);
   }
   if (q) {
-    query.$or = [
+    const orConditions = [
       { firstName: { $regex: q, $options: 'i' } },
       { lastName: { $regex: q, $options: 'i' } },
       { email: { $regex: q, $options: 'i' } },
       { company: { $regex: q, $options: 'i' } },
       { subject: { $regex: q, $options: 'i' } },
     ];
+
+    const cleanQ = q.trim();
+    let extractedNumber = null;
+
+    const easyMatch = cleanQ.match(/^EASY-\d{4}-\d{2}-(\d+)$/i);
+    const lMatch = cleanQ.match(/^L-(\d+)$/i);
+    const rawNumberMatch = cleanQ.match(/^\d+$/);
+
+    if (easyMatch) {
+      extractedNumber = parseInt(easyMatch[1], 10);
+    } else if (lMatch) {
+      extractedNumber = parseInt(lMatch[1], 10);
+    } else if (rawNumberMatch) {
+      extractedNumber = parseInt(rawNumberMatch[0], 10);
+    }
+
+    if (extractedNumber !== null && !isNaN(extractedNumber)) {
+      orConditions.push({ leadNumber: extractedNumber });
+    }
+
+    query.$or = orConditions;
   }
   return this.find(query).sort({ createdAt: -1 }).limit(200);
 };
@@ -384,7 +414,7 @@ leadSchema.statics.findExpiredProposals = function (tenantId) {
 leadSchema.statics.exportToCSV = async function (tenantId, filters = {}) {
   const leads = await this.find({ tenantId, isDeleted: false, ...filters }).lean();
   return leads.map((l) => ({
-    leadNumber: `L-${String(l.leadNumber).padStart(5, '0')}`,
+    leadNumber: formatLeadNumber(l.leadNumber, l.createdAt),
     firstName: l.firstName, lastName: l.lastName,
     email: l.email, phone: l.phone || '', company: l.company || '',
     jobTitle: l.jobTitle || '', subject: l.subject,
@@ -402,7 +432,7 @@ leadSchema.statics.getProposalFunnelStats = async function (tenantId) {
   const [statusCounts, expiringSoon, declineReasons, avgData] = await Promise.all([
     this.aggregate([{ $match: base }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
     this.find({ tenantId, isDeleted: false, status: { $in: ['proposal_sent', 'proposal_viewed'] }, proposalExpiresAt: { $gte: now, $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } })
-      .select('leadNumber firstName email proposalExpiresAt').lean(),
+      .select('leadNumber firstName email proposalExpiresAt createdAt').lean(),
     this.aggregate([
       { $match: { ...base, proposalDeclinedReason: { $exists: true, $ne: '' } } },
       { $group: { _id: '$proposalDeclinedReason', count: { $sum: 1 } } },
@@ -430,7 +460,7 @@ leadSchema.statics.getProposalFunnelStats = async function (tenantId) {
     avgRevisionCount: Math.round(avgData[0]?.avgRevisionCount || 0),
     expiringSoon: expiringSoon.map((l) => ({
       leadId: l._id,
-      leadNumber: `L-${String(l.leadNumber).padStart(5, '0')}`,
+      leadNumber: formatLeadNumber(l.leadNumber, l.createdAt),
       firstName: l.firstName, email: l.email, validUntil: l.proposalExpiresAt,
       daysRemaining: Math.ceil((new Date(l.proposalExpiresAt) - now) / 86400000),
     })),
