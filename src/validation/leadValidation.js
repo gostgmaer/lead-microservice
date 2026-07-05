@@ -2,6 +2,16 @@ import { body, query, validationResult } from 'express-validator';
 import { sendError } from '../utils/responseHelper.js';
 import { STATUS_ENUM, BUDGET_ENUM, TIMELINE_ENUM, PROJECT_TYPE_ENUM, CONTACT_METHOD_ENUM, BRAND_ENUM } from '../models/Lead.js';
 
+// gmail_remove_subaddress/gmail_remove_dots default to true, which would
+// silently collapse kishor+124@gmail.com to kishor@gmail.com — breaking the
+// +tag convention used for dev/staging test signups (same options already
+// used by user-authentication-microservice's validators).
+const EMAIL_NORMALIZE_OPTIONS = {
+  gmail_remove_subaddress: false,
+  gmail_remove_dots: false,
+  gmail_convert_googlemaildotcom: false,
+};
+
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -18,7 +28,7 @@ export const handleValidationErrors = (req, res, next) => {
 export const validateSubmitLead = [
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),
-  body('email').trim().isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('email').trim().isEmail().normalizeEmail(EMAIL_NORMALIZE_OPTIONS).withMessage('Valid email is required'),
   body('subject').trim().notEmpty().isLength({ max: 200 }).withMessage('Subject is required (max 200 chars)'),
   body('message').trim().notEmpty().isLength({ max: 5000 }).withMessage('Message is required (max 5000 chars)'),
   body('phone').optional().trim(),
@@ -122,7 +132,7 @@ export const validateStatusTransition = [
 export const validateUpdateLead = [
   body('firstName').optional().trim().notEmpty(),
   body('lastName').optional().trim().notEmpty(),
-  body('email').optional().trim().isEmail().normalizeEmail(),
+  body('email').optional().trim().isEmail().normalizeEmail(EMAIL_NORMALIZE_OPTIONS),
   body('phone').optional().trim(),
   body('company').optional().trim(),
   body('subject').optional().trim().isLength({ max: 200 }),
