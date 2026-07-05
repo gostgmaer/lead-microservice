@@ -353,7 +353,7 @@ export async function sendProposal(leadId, tenantId, proposalData, sentBy, agent
 
   leadEmail.sendProposalEmail(lead, {
     proposalNumber,
-    proposalUrl: `${config.app.frontendUrl}/proposal/view/${accessKey}`,
+    proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
     quotedAmount: proposalData.quotedAmount,
     validUntil: proposalData.validUntil,
     message: proposalData.message,
@@ -431,7 +431,7 @@ export async function reviseProposal(leadId, tenantId, data, revisedBy, agentNam
   await lead.save();
   leadEmail.sendProposalEmail(lead, {
     proposalNumber,
-    proposalUrl: `${config.app.frontendUrl}/proposal/view/${accessKey}`,
+    proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
     quotedAmount: data.quotedAmount,
     validUntil: data.validUntil,
     message: `[Revised] ${data.revisionNote}`,

@@ -18,15 +18,17 @@ import {
 } from '../email/leadEmailTemplate.js';
 
 const URL   = config.email.serviceUrl;
-const KEY   = config.emailApiKey;
+const KEY   = config.email.apiKey;
 const ADMIN = config.email.adminEmail;
 const DASH  = config.dashboard.url;
-const TENANT = config.tenantRef;
 const APP_NAME = config.app.name || 'EasyDev';
-const APP_URL  = config.app.frontendUrl;
 
-function _dispatch(to, template, data) {
-  const idempotencyKey = `${template.toLowerCase()}-${TENANT}-${to}`;
+// tenantId comes from the lead itself (guaranteed present now that
+// TENANCY_ENABLED is on) rather than a static default — every caller below
+// already has the lead object in scope.
+function _dispatch(to, template, data, tenantId) {
+  const resolvedTenant = tenantId || config.tenant.defaultTenantId || '';
+  const idempotencyKey = `${template.toLowerCase()}-${resolvedTenant}-${to}`;
   logger.info(`[leadEmail] Dispatching ${template} to ${to}`, { idempotencyKey });
   return apiCall(
     `${URL}/email/send`,
@@ -35,9 +37,9 @@ function _dispatch(to, template, data) {
       headers: {
         'Content-Type': 'application/json',
         ...(KEY ? { 'x-api-key': KEY } : {}),
-        'x-tenant-id': TENANT,
+        'x-tenant-id': resolvedTenant,
         'x-app-name': APP_NAME,
-        'x-app-url': APP_URL,
+        'x-app-url': DASH,
         'x-path': '/dashboard',
         'x-idempotency-key': idempotencyKey,
       },
@@ -62,7 +64,7 @@ export function sendLeadReceived(lead) {
     firstName: lead.firstName, lastName: lead.lastName,
     leadNumber: lead.leadNumberFormatted, subject: lead.subject,
     projectType: lead.projectType || 'other', budget: lead.budget, timeline: lead.timeline,
-  });
+  }, lead.tenantId);
 }
 
 export function sendAdminLeadNotification(lead) {
@@ -75,7 +77,7 @@ export function sendAdminLeadNotification(lead) {
     source: lead.source, priority: lead.priority, score: lead.score,
     ipAddress: lead.ipAddress, submittedAt: lead.createdAt,
     reviewUrl: `${DASH}/leads/${lead._id}`,
-  });
+  }, lead.tenantId);
 }
 
 // ─── Communication ────────────────────────────────────────────────────────────
@@ -85,14 +87,14 @@ export function sendContactReply(lead, { subject, message, agentName, agentEmail
     firstName: lead.firstName, lastName: lead.lastName,
     leadNumber: lead.leadNumberFormatted, subject, message,
     agentName, agentEmail, agentTitle,
-  });
+  }, lead.tenantId);
 }
 
 export function sendStatusChanged(lead, { oldStatus, newStatus, note, agentName, ctaUrl }) {
   return _dispatch(lead.email, LEAD_STATUS_CHANGED, {
     firstName: lead.firstName, lastName: lead.lastName,
     leadNumber: lead.leadNumberFormatted, oldStatus, newStatus, note, agentName, ctaUrl,
-  });
+  }, lead.tenantId);
 }
 
 export function sendFollowUpReminder(agentEmail, lead, agent, { followUpDate, daysSinceLastContact, notes, reviewUrl }) {
@@ -102,7 +104,7 @@ export function sendFollowUpReminder(agentEmail, lead, agent, { followUpDate, da
     leadFirstName: lead.firstName, leadLastName: lead.lastName,
     leadEmail: lead.email, leadCompany: lead.company,
     priority: lead.priority, followUpDate, daysSinceLastContact, notes, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 // ─── Proposal Lifecycle ───────────────────────────────────────────────────────
@@ -113,7 +115,7 @@ export function sendProposalEmail(lead, { proposalNumber, proposalUrl, quotedAmo
     projectName: lead.subject, proposalUrl, proposalNumber,
     issueDate: new Date().toLocaleDateString(),
     validUntil, quotedAmount, message, attachmentName,
-  });
+  }, lead.tenantId);
 }
 
 export function sendProposalAccepted(lead, agentName) {
@@ -121,7 +123,7 @@ export function sendProposalAccepted(lead, agentName) {
     firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
     projectName: lead.subject, quotedAmount: lead.quotedAmount,
     quotedCurrency: lead.quotedCurrency, agentName,
-  });
+  }, lead.tenantId);
 }
 
 export function sendAdminProposalAccepted(lead, reviewUrl) {
@@ -130,14 +132,14 @@ export function sendAdminProposalAccepted(lead, reviewUrl) {
     firstName: lead.firstName, lastName: lead.lastName,
     email: lead.email, company: lead.company,
     projectName: lead.subject, quotedAmount: lead.quotedAmount, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 export function sendProposalDeclinedAck(lead, agentName) {
   return _dispatch(lead.email, LEAD_PROPOSAL_DECLINED_ACK, {
     firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
     projectName: lead.subject, agentName, supportEmail: ADMIN,
-  });
+  }, lead.tenantId);
 }
 
 export function sendAdminProposalDeclined(lead, { declinedReason, reviewUrl }) {
@@ -145,7 +147,7 @@ export function sendAdminProposalDeclined(lead, { declinedReason, reviewUrl }) {
     leadNumber: lead.leadNumberFormatted,
     firstName: lead.firstName, lastName: lead.lastName,
     email: lead.email, company: lead.company, declinedReason, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 export function sendProposalExpiringSoon(lead, { proposalNumber, validUntil, daysRemaining, reviewUrl }) {
@@ -153,7 +155,7 @@ export function sendProposalExpiringSoon(lead, { proposalNumber, validUntil, day
     leadNumber: lead.leadNumberFormatted,
     firstName: lead.firstName, lastName: lead.lastName,
     email: lead.email, proposalNumber, validUntil, daysRemaining, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 export function sendProposalExpired(lead, { proposalNumber, expiredAt, reviewUrl }) {
@@ -161,7 +163,7 @@ export function sendProposalExpired(lead, { proposalNumber, expiredAt, reviewUrl
     leadNumber: lead.leadNumberFormatted,
     firstName: lead.firstName, lastName: lead.lastName,
     email: lead.email, proposalNumber, expiredAt, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 // ─── Contract Lifecycle ───────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ export function sendContractEmail(lead, { contractUrl, message, agentName }) {
   return _dispatch(lead.email, LEAD_CONTRACT_SENT, {
     firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
     projectName: lead.subject, contractUrl, message, agentName,
-  });
+  }, lead.tenantId);
 }
 
 export function sendContractSigned(lead, agentName) {
@@ -178,11 +180,11 @@ export function sendContractSigned(lead, agentName) {
     _dispatch(lead.email, LEAD_CONTRACT_SIGNED, {
       firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
       projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
-    }),
+    }, lead.tenantId),
     _dispatch(ADMIN, LEAD_CONTRACT_SIGNED, {
       firstName: lead.firstName, leadNumber: lead.leadNumberFormatted,
       projectName: lead.subject, contractSignedAt: lead.contractSignedAt, agentName,
-    })
+    }, lead.tenantId)
   ]);
 }
 
@@ -195,7 +197,7 @@ export function sendWonNotification(lead, { agentName, reviewUrl }) {
     email: lead.email, company: lead.company, projectName: lead.subject,
     quotedAmount: lead.quotedAmount, quotedCurrency: lead.quotedCurrency,
     closedAt: new Date(), agentName, reviewUrl,
-  });
+  }, lead.tenantId);
 }
 
 export function sendLostNotification(lead, { lostReason, agentName, reviewUrl }) {
@@ -203,5 +205,5 @@ export function sendLostNotification(lead, { lostReason, agentName, reviewUrl })
     leadNumber: lead.leadNumberFormatted,
     firstName: lead.firstName, lastName: lead.lastName,
     email: lead.email, company: lead.company, lostReason, agentName, reviewUrl,
-  });
+  }, lead.tenantId);
 }

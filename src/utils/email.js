@@ -2,13 +2,13 @@ import { config } from "../config/index.js";
 import logger from "./logger.js";
 import axios from "axios";
 const EMAIL_SERVICE_URL = `${config.email.serviceUrl}/email/send`;
-const EMAIL_API_KEY = config.emailApiKey || '';
+const EMAIL_API_KEY = config.email.apiKey || '';
 
 const getSupportEmail = () => {
-	if (!config.admin.email) {
+	if (!config.email.adminEmail) {
 		throw new Error('ADMIN_EMAIL must be configured for email templates');
 	}
-	return config.admin.email;
+	return config.email.adminEmail;
 };
 
 /**
@@ -37,8 +37,11 @@ export const sendEmail = async (options) => {
 
 		console.log("Email send:", { to: payload.to, template: payload.template });
 
-		const tenantId = config.tenantRef;
-		if (!tenantId) throw new Error('TENANT env var is not set — cannot send email without a tenant identifier');
+		// These flows (newsletter, onboarding) have no per-request tenant to
+		// draw from — fall back to the platform default. Soft, not required:
+		// notification-service's own tenant middleware already treats a
+		// missing x-tenant-id as "use my configured default", not an error.
+		const tenantId = config.tenant.defaultTenantId || '';
 		// Auto-generate idempotency key matching the pattern used across all services:
 		// {template_lowercase}-{tenantId}-{recipient}
 		const resolvedIdempotencyKey =
@@ -50,7 +53,7 @@ export const sendEmail = async (options) => {
 			"x-tenant-id": tenantId,
 			"x-app": APP_NAME,
 			"x-app-name": APP_NAME,
-			"x-app-url": config.app.frontendUrl,
+			"x-app-url": config.dashboard.url,
 			"x-path": path || "/dashboard",
 			"x-idempotency-key": resolvedIdempotencyKey,
 		};
@@ -80,7 +83,7 @@ export const sendEmail = async (options) => {
  */
 export const sendNewsletterSubscriptionConfirmation = async (subscriber) => {
 	try {
-		const confirmationUrl = `${config.app.frontendUrl}/newsletter/confirm?token=${subscriber.confirmationToken}`;
+		const confirmationUrl = `${config.dashboard.url}/newsletter/confirm?token=${subscriber.confirmationToken}`;
 		await sendEmail({
 			to: subscriber.email,
 			templateId: "NEWSLETTER_SUBSCRIBE_CONFIRMATION",
@@ -104,7 +107,7 @@ export const sendNewsletterSubscriptionConfirmation = async (subscriber) => {
  */
 export const sendNewsletterWelcomeConfirmed = async (subscriber) => {
 	try {
-		const unsubscribeUrl = `${config.app.frontendUrl}/newsletter/unsubscribe?email=${encodeURIComponent(subscriber.email)}`;
+		const unsubscribeUrl = `${config.dashboard.url}/newsletter/unsubscribe?email=${encodeURIComponent(subscriber.email)}`;
 		await sendEmail({
 			to: subscriber.email,
 			templateId: "NEWSLETTER_WELCOME",
@@ -128,7 +131,7 @@ export const sendNewsletterWelcomeConfirmed = async (subscriber) => {
  */
 export const sendNewsletterResubscribeWelcome = async (subscriber) => {
 	try {
-		const unsubscribeUrl = `${config.app.frontendUrl}/newsletter/unsubscribe?email=${encodeURIComponent(subscriber.email)}`;
+		const unsubscribeUrl = `${config.dashboard.url}/newsletter/unsubscribe?email=${encodeURIComponent(subscriber.email)}`;
 		await sendEmail({
 			to: subscriber.email,
 			templateId: "NEWSLETTER_RESUBSCRIBE",
