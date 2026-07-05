@@ -18,7 +18,14 @@ const config = {
 		adminEmail: process.env.ADMIN_EMAIL || "admin@example.com",
 	},
 	auth: {
-		serviceUrl: process.env.AUTH_SERVICE_URL || "http://localhost:4002",
+		// IAM_SERVICE_URL is the platform-wide name (gateway/support-ai/etc. all
+		// use it) — AUTH_SERVICE_URL is never actually set by generate-env.sh,
+		// so this always fell back to the hardcoded default below, which
+		// resolves to nothing inside the container. Every introspection call
+		// then failed, and auth.js's middleware treats that identically to a
+		// genuinely revoked session — a network/config failure masquerading as
+		// "Session has been revoked or expired" on every single request.
+		serviceUrl: process.env.IAM_SERVICE_URL || process.env.AUTH_SERVICE_URL || "http://localhost:4002",
 		// IAM-issued JWT verification (local, no network hop) — same convention
 		// as the gateway and every other product service: RS256 with IAM's
 		// public key (raw PEM or base64-encoded PEM), HS256 shared-secret as
