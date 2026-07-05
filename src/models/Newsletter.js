@@ -7,7 +7,10 @@ const newsletterSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    // '+' added to the local-part class — the route-level isEmail() validator
+    // already accepts plus-addressing (kishor+124@mail.com), but this regex
+    // didn't, so it was silently rejecting the same test-signup convention.
+    match: [/^\w+([.+-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   name: {
     type: String,
