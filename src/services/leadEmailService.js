@@ -109,10 +109,10 @@ export function sendFollowUpReminder(agentEmail, lead, agent, { followUpDate, da
 
 // ─── Proposal Lifecycle ───────────────────────────────────────────────────────
 
-export function sendProposalEmail(lead, { proposalNumber, proposalUrl, quotedAmount, quotedCurrency, validUntil, message, attachmentName }) {
+export function sendProposalEmail(lead, { proposalNumber, proposalUrl, pdfUrl, quotedAmount, quotedCurrency, validUntil, message, attachmentName }) {
   return _dispatch(lead.email, PROJECT_PROPOSAL_EMAIL, {
     clientName: `${lead.firstName} ${lead.lastName}`,
-    projectName: lead.subject, proposalUrl, proposalNumber,
+    projectName: lead.subject, proposalUrl, pdfUrl, proposalNumber,
     issueDate: new Date().toLocaleDateString(),
     validUntil, quotedAmount, quotedCurrency: quotedCurrency || lead.quotedCurrency || 'USD', message, attachmentName,
   }, lead.tenantId);
