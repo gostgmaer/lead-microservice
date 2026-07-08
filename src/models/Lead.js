@@ -13,7 +13,12 @@ export const STATUS_ENUM = [
 ];
 
 export const PRIORITY_ENUM = ['low', 'medium', 'high', 'urgent'];
-export const BUDGET_ENUM = ['under-5k', '5k-10k', '10k-25k', '25k-50k', '50k-100k', 'over-100k', 'not-sure'];
+// Real ₹ ranges matching the marketing intake form's budget picker (see
+// UI/easydev/lib/contact-data.ts BUDGET_RANGES) — previously this enum used
+// a much smaller, unrelated scale (under-5k..over-100k) that the frontend's
+// mapBudget() silently collapsed real ₹50k-1.5L+ selections into, understating
+// customer budgets by ~10x in scoring, priority, and every display of `budget`.
+export const BUDGET_ENUM = ['under-50k', '50k-150k', '150k-500k', '500k-1500k', 'over-1500k', 'not-sure'];
 export const TIMELINE_ENUM = ['asap', '1-month', '2-3months', '3-6months', '6months+', 'flexible'];
 export const PROJECT_TYPE_ENUM = ['website', 'webapp', 'mobile', 'ecommerce', 'redesign', 'maintenance', 'consulting', 'other'];
 export const SOURCE_ENUM = ['website', 'referral', 'social', 'email', 'api', 'import', 'manual', 'other'];
@@ -240,11 +245,11 @@ leadSchema.pre('save', async function (next) {
     this.leadNumber = await Counter.nextSequence(`lead_${this.tenantId}`);
   }
   const { budget, timeline } = this;
-  if (budget === 'over-100k' || budget === '50k-100k') {
+  if (budget === 'over-1500k' || budget === '500k-1500k') {
     this.priority = 'urgent';
-  } else if (budget === '25k-50k' || timeline === 'asap') {
+  } else if (budget === '150k-500k' || timeline === 'asap') {
     this.priority = 'high';
-  } else if (budget === 'under-5k' || timeline === '6months+') {
+  } else if (budget === 'under-50k' || timeline === '6months+') {
     this.priority = 'low';
   } else if (!this.priority) {
     this.priority = 'medium';
@@ -257,7 +262,7 @@ leadSchema.pre('save', async function (next) {
 
 leadSchema.statics.computeLeadScore = function (lead) {
   let score = 0;
-  const budgetMap = { 'over-100k': 30, '50k-100k': 25, '25k-50k': 18, '10k-25k': 12, '5k-10k': 6 };
+  const budgetMap = { 'over-1500k': 30, '500k-1500k': 25, '150k-500k': 18, '50k-150k': 12 };
   score += budgetMap[lead.budget] ?? 2;
   const timelineMap = { asap: 20, '1-month': 16, '2-3months': 12, '3-6months': 8 };
   score += timelineMap[lead.timeline] ?? 3;
