@@ -191,10 +191,23 @@ export async function updateLeadStatus(lead, newStatus, note = null, changedBy =
 
 // ─── Lead CRUD ────────────────────────────────────────────────────────────────
 
+// Signature of raw MIME/email source (headers, multipart boundaries) being pasted
+// into a free-text field — a classic contact-form injection/spam-bot pattern that
+// would otherwise be stored and echoed verbatim into notification emails.
+const MIME_INJECTION_PATTERN = /Content-(Type|Transfer-Encoding|Disposition):|^-{2,}=?_?Part_|MIME-Version:/im;
+
+function looksLikeMimeInjection(...fields) {
+  return fields.some((f) => typeof f === 'string' && MIME_INJECTION_PATTERN.test(f));
+}
+
 export async function createLead(data, tenantId, meta = {}) {
   const { ipAddress, userAgent, source } = meta;
   // SECURITY FIX: align honeypot field with UI (hp)
-  const isSpam = !!((data.hp && data.hp.trim().length > 0) || (data.website_url && data.website_url.trim().length > 0));
+  const isSpam = !!(
+    (data.hp && data.hp.trim().length > 0) ||
+    (data.website_url && data.website_url.trim().length > 0) ||
+    looksLikeMimeInjection(data.message, data.subject)
+  );
   const lead = new Lead({
     ...data,
     tenantId,
