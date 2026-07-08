@@ -228,7 +228,7 @@ export async function updateLead(id, tenantId, updates, updatedBy) {
   const ALLOWED = [
     'firstName', 'lastName', 'email', 'phone', 'company', 'jobTitle',
     'website', 'linkedIn', 'country', 'city', 'timezone',
-    'subject', 'message', 'projectType', 'budget', 'timeline', 'requirements', 'category',
+    'subject', 'message', 'projectType', 'budget', 'requestedBudgetAmount', 'timeline', 'requirements', 'category',
     'tags', 'labels', 'customFields', 'siteKey', 'pipelineStage',
     'assignedTo', 'nextFollowUp', 'preferredContactMethod', 'preferredContactTime',
     'utmSource', 'utmMedium', 'utmCampaign', 'utmContent', 'utmTerm', 'landingPage', 'externalId',
@@ -332,6 +332,7 @@ export async function sendProposal(leadId, tenantId, proposalData, sentBy, agent
     accessKey,
     quotedAmount: proposalData.quotedAmount,
     quotedCurrency: proposalData.quotedCurrency || 'USD',
+    breakdown: proposalData.breakdown,
     validUntil: proposalData.validUntil,
     sentAt: new Date(),
     sentBy,
@@ -355,6 +356,7 @@ export async function sendProposal(leadId, tenantId, proposalData, sentBy, agent
     proposalNumber,
     proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
     quotedAmount: proposalData.quotedAmount,
+    quotedCurrency: proposalData.quotedCurrency || 'USD',
     validUntil: proposalData.validUntil,
     message: proposalData.message,
     attachmentName: proposalData.attachmentName,
@@ -374,7 +376,7 @@ export async function resendProposal(leadId, tenantId, messageOverride, sentBy, 
   if (activeEntry.status === 'expired') activeEntry.status = 'sent';
   lead.notes.push({ content: `Proposal v${activeEntry.version} resent`, isInternal: true, createdAt: new Date(), createdBy: sentBy });
   await lead.save();
-  leadEmail.sendProposalEmail(lead, { proposalNumber: activeEntry.proposalNumber, proposalUrl: activeEntry.proposalUrl, quotedAmount: activeEntry.quotedAmount, validUntil: activeEntry.validUntil, message: messageOverride || activeEntry.message, attachmentName: activeEntry.attachmentName });
+  leadEmail.sendProposalEmail(lead, { proposalNumber: activeEntry.proposalNumber, proposalUrl: activeEntry.proposalUrl, quotedAmount: activeEntry.quotedAmount, quotedCurrency: activeEntry.quotedCurrency || 'USD', validUntil: activeEntry.validUntil, message: messageOverride || activeEntry.message, attachmentName: activeEntry.attachmentName });
   return { lead, version: activeEntry.version, proposalNumber: activeEntry.proposalNumber };
 }
 
@@ -406,6 +408,7 @@ export async function reviseProposal(leadId, tenantId, data, revisedBy, agentNam
     accessKey,
     quotedAmount: data.quotedAmount,
     quotedCurrency: data.quotedCurrency || 'USD',
+    breakdown: data.breakdown,
     validUntil: data.validUntil,
     sentAt: new Date(),
     sentBy: revisedBy,
@@ -433,6 +436,7 @@ export async function reviseProposal(leadId, tenantId, data, revisedBy, agentNam
     proposalNumber,
     proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
     quotedAmount: data.quotedAmount,
+    quotedCurrency: data.quotedCurrency || 'USD',
     validUntil: data.validUntil,
     message: `[Revised] ${data.revisionNote}`,
     attachmentName: data.attachmentName,
