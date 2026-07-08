@@ -80,7 +80,18 @@ export async function uploadFile(buffer, fileName, mimeType, req) {
     return uploadViaFileService(buffer, fileName, mimeType, req);
   }
 
-  // Local filesystem fallback — DEV ONLY.
+  // Local filesystem fallback is dev-only convenience. In production this
+  // would silently write to ephemeral/per-instance disk and hand back a URL
+  // that 404s the moment the request completes (or on the next deploy) —
+  // exactly the "client can't open the proposal link" failure this is meant
+  // to prevent — so fail loudly instead of generating a broken shareable URL.
+  if (config.app.env === "production") {
+    throw new Error(
+      "File upload service is not configured (FILE_UPLOAD_SERVICE_URL / FILE_UPLOAD_HMAC_SECRET) — " +
+      "refusing to fall back to local disk storage in production, since the resulting URL would not be shareable."
+    );
+  }
+
   const uploadsDir = path.resolve(process.cwd(), "uploads", "proposals");
   const outputPath = path.join(uploadsDir, fileName);
 
