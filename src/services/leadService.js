@@ -355,6 +355,7 @@ export async function sendProposal(leadId, tenantId, proposalData, sentBy, agent
   leadEmail.sendProposalEmail(lead, {
     proposalNumber,
     proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
+    pdfUrl: proposalUrl,
     quotedAmount: proposalData.quotedAmount,
     quotedCurrency: proposalData.quotedCurrency || 'USD',
     validUntil: proposalData.validUntil,
@@ -376,7 +377,17 @@ export async function resendProposal(leadId, tenantId, messageOverride, sentBy, 
   if (activeEntry.status === 'expired') activeEntry.status = 'sent';
   lead.notes.push({ content: `Proposal v${activeEntry.version} resent`, isInternal: true, createdAt: new Date(), createdBy: sentBy });
   await lead.save();
-  leadEmail.sendProposalEmail(lead, { proposalNumber: activeEntry.proposalNumber, proposalUrl: activeEntry.proposalUrl, quotedAmount: activeEntry.quotedAmount, quotedCurrency: activeEntry.quotedCurrency || 'USD', validUntil: activeEntry.validUntil, message: messageOverride || activeEntry.message, attachmentName: activeEntry.attachmentName });
+  const trackingUrl = `${config.dashboard.url}/proposal/view/${activeEntry.accessKey}`;
+  leadEmail.sendProposalEmail(lead, {
+    proposalNumber: activeEntry.proposalNumber,
+    proposalUrl: trackingUrl,
+    pdfUrl: activeEntry.proposalUrl,
+    quotedAmount: activeEntry.quotedAmount,
+    quotedCurrency: activeEntry.quotedCurrency || 'USD',
+    validUntil: activeEntry.validUntil,
+    message: messageOverride || activeEntry.message,
+    attachmentName: activeEntry.attachmentName,
+  });
   return { lead, version: activeEntry.version, proposalNumber: activeEntry.proposalNumber };
 }
 
@@ -435,6 +446,7 @@ export async function reviseProposal(leadId, tenantId, data, revisedBy, agentNam
   leadEmail.sendProposalEmail(lead, {
     proposalNumber,
     proposalUrl: `${config.dashboard.url}/proposal/view/${accessKey}`,
+    pdfUrl: proposalUrl,
     quotedAmount: data.quotedAmount,
     quotedCurrency: data.quotedCurrency || 'USD',
     validUntil: data.validUntil,
