@@ -39,6 +39,7 @@ export const validateSubmitLead = [
     .custom((v) => v === true || v === 'true')
     .withMessage('GDPR consent must be explicitly accepted (true)'),
   body('budget').optional().isIn(BUDGET_ENUM).withMessage('Invalid budget value'),
+  body('requestedBudgetAmount').optional().isFloat({ min: 0 }).withMessage('Invalid budget amount'),
   body('timeline').optional().isIn(TIMELINE_ENUM).withMessage('Invalid timeline value'),
   body('projectType').optional().isIn(PROJECT_TYPE_ENUM).withMessage('Invalid project type'),
   body('category').optional().isIn(['General Inquiry', 'Technical Support', 'Sales', 'Partnership', 'Feedback', 'Career', 'Other']),

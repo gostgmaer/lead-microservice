@@ -32,6 +32,13 @@ const proposalSchema = new mongoose.Schema({
   accessKey:       { type: String, unique: true, sparse: true }, // Secure unguessable token for public viewing
   quotedAmount:    { type: Number },
   quotedCurrency:  { type: String, default: 'USD' },
+  // Itemized price breakdown (development line items, launch cost, hosting/
+  // maintenance figures, term, discount, GST) used to render the PDF at send
+  // time. Previously this was transient — only quotedAmount was persisted, so
+  // the breakdown could never be shown again in the UI or proposal history.
+  // Mixed because the shape is frontend-editable and varies by document type
+  // (proposal/contract vs quotation/invoice) — same pattern as customFields.
+  breakdown:       { type: mongoose.Schema.Types.Mixed },
   validUntil:      { type: Date },
   sentAt:          { type: Date },
   sentBy:          { type: String },
@@ -110,6 +117,10 @@ const leadSchema = new mongoose.Schema(
     message:      { type: String, required: true, maxlength: 5000, get: decrypt, set: encrypt },
     projectType:  { type: String, enum: PROJECT_TYPE_ENUM },
     budget:       { type: String, enum: BUDGET_ENUM },
+    // Exact price the requester entered on the intake form, distinct from the
+    // bucketed `budget` range enum above — feeds the Price Breakdown modal's
+    // starting amount so staff aren't guessing from a range.
+    requestedBudgetAmount: { type: Number, min: 0 },
     timeline:     { type: String, enum: TIMELINE_ENUM },
     requirements: { type: [String] },
     category:     { type: String, enum: CATEGORY_ENUM },
