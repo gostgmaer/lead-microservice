@@ -69,7 +69,7 @@ export async function updateLeadStatus(lead, newStatus, note = null, changedBy =
   if (current !== targetStatus) {
     const allowed = VALID_TRANSITIONS[current] || [];
     if (!allowed.includes(targetStatus)) {
-      throw new AppError(`Invalid status transition: ${current} → ${targetStatus}`, 422, 'UNPROCESSABLE_ENTITY');
+      throw AppError.unprocessable(`Invalid status transition: ${current} → ${targetStatus}`);
     }
   }
 
