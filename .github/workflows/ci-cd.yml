@@ -8,21 +8,21 @@ name: Lead Microservice Pipeline
 # stack (Express/ESM, npm, no Prisma, no build step, eslint but no test suite).
 
 on:
-  push:
-    branches: [main, develop, 'feature/**']
-  pull_request:
-    branches: [main, develop]
+  # push:
+  # branches: [main, develop, 'feature/**']
+  # pull_request:
+  # branches: [main, develop]
   workflow_dispatch:
-    inputs:
-      run_mode:
-        description: "Manual run mode (deploy-only reuses the latest image already in GHCR)"
-        required: true
-        default: "build-and-deploy"
-        type: choice
-        options:
-          - build-and-deploy
-          - build-only
-          - deploy-only
+  # inputs:
+  # run_mode:
+  # description: "Manual run mode (deploy-only reuses the latest image already in GHCR)"
+  # required: true
+  # default: "build-and-deploy"
+  # type: choice
+  # options:
+  # - build-and-deploy
+  # - build-only
+  # - deploy-only
 
 permissions:
   contents: write
