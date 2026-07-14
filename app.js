@@ -17,6 +17,7 @@ import { notFound, errorHandler } from './src/middleware/errorHandler.js';
 import { connectDB } from './src/config/db.js';
 import logger from './src/middleware/logger.js';
 import leadRoutes from './src/routes/leads.js';
+import contactRoutes from './src/routes/contact.js';
 import newsletterRoutes from './src/routes/newsletter.js';
 import uploadRoutes from './src/routes/upload.js';
 import calculatorRoutes from './src/routes/calculator.js';
@@ -91,6 +92,7 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/leads', leadRoutes);
+app.use('/api/contact', contactRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/calculator', calculatorRoutes);
