@@ -650,3 +650,24 @@ export async function toggleSpam(leadId, tenantId, updatedBy) {
   await lead.save();
   return lead;
 }
+
+/**
+ * Cross-service account-deletion cascade: called by IAM when a staff IAM
+ * user is archived or hard-deleted. Previously nothing here reacted at all
+ * — a lead stayed assigned to a now-archived account forever, and the daily
+ * follow-up-reminder scheduler (leadSchedulerService.runFollowUpReminders)
+ * kept emailing on that account's behalf indefinitely since its query only
+ * excludes leads where assignedTo doesn't exist.
+ *
+ * Unassigns rather than reassigns — picking a new owner is a business
+ * decision this service has no basis to make; clearing assignedTo just
+ * stops the stale automation and leaves the lead visible to whoever
+ * re-triages unassigned leads.
+ */
+export async function unassignLeadsForStaff(iamUserId) {
+  const result = await Lead.updateMany(
+    { assignedTo: iamUserId },
+    { $unset: { assignedTo: '' } },
+  );
+  return { unassignedCount: result.modifiedCount ?? result.nModified ?? 0 };
+}

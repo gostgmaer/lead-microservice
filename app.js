@@ -21,6 +21,7 @@ import contactRoutes from './src/routes/contact.js';
 import newsletterRoutes from './src/routes/newsletter.js';
 import uploadRoutes from './src/routes/upload.js';
 import calculatorRoutes from './src/routes/calculator.js';
+import internalRoutes from './src/routes/internal.js';
 
 // server.js (traditional/local start) also calls connectDB() and exits on
 // failure. On Vercel, app.js is the actual serverless entry point (default
@@ -96,6 +97,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/calculator', calculatorRoutes);
+app.use('/internal', internalRoutes);
 
 // ─── Root health check ────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
