@@ -73,6 +73,10 @@ const config = {
 		defaultTenantId: process.env.DEFAULT_TENANT_ID ? process.env.DEFAULT_TENANT_ID.trim() : null,
 	},
 	redis: { enabled: process.env.REDIS_ENABLED === "true", url: process.env.REDIS_URL || null },
+	// Service-to-service calls (e.g. IAM's user-archive cascade) — never a
+	// user JWT, so a separate shared-secret guard, matching the ApiKeyGuard
+	// pattern job-agent-service/ai-comm already use for their own /internal routes.
+	internal: { apiKey: (process.env.INTERNAL_API_KEY || "").trim() || null },
 };
 
 export default config;
