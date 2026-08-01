@@ -6,11 +6,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+RUN corepack enable && corepack prepare pnpm@10.33.2 --activate
+
 # Copy manifest + lockfile first for Docker layer caching
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies only
-RUN npm ci --omit=dev
+RUN pnpm install --frozen-lockfile --prod
 
 # Copy application source (node_modules excluded via .dockerignore)
 COPY . .
