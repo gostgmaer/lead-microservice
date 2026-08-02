@@ -68,15 +68,9 @@ export const getProposalVersion = catchAsync(async (req, res) => {
   return sendSuccess(res, { data: entry, message: 'Proposal version' });
 });
 
-// GET /api/leads/:id/proposal/view/:version  — public, tracks view and redirects
-export const trackProposalView = catchAsync(async (req, res) => {
-  const { proposalUrl } = await leadService.trackProposalView(req.params.id, req.params.version);
-  return res.redirect(302, proposalUrl);
-});
-
 // GET /api/leads/proposal/view/:accessKey — public, secure tracking
 export const trackProposalViewByKey = catchAsync(async (req, res) => {
-  const { proposalUrl } = await leadService.trackProposalView(null, null, req.params.accessKey);
+  const { proposalUrl } = await leadService.trackProposalView(req.params.accessKey);
   return res.redirect(302, proposalUrl);
 });
 

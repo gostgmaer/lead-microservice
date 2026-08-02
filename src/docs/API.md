@@ -149,7 +149,8 @@ The lead module is owned by this repo.
 |---|---|---|
 | `GET` | `/leads/health` | module health |
 | `POST` | `/leads/submit` | public submit, requires `x-tenant-id` |
-| `GET` | `/leads/:id/proposal/view/:version` | public proposal view tracking |
+| `GET` | `/leads/proposal/view/:accessKey` | public proposal view tracking, accessKey-gated |
+| `PATCH` | `/leads/proposal/accept/:accessKey` | public client-side proposal acceptance, accessKey-gated |
 
 Public submit example:
 

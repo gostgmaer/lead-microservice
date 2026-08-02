@@ -518,19 +518,10 @@ export async function clientAcceptProposal(accessKey, { ip, userAgent, signature
   return { lead, proposalNumber: entry.proposalNumber };
 }
 
-export async function trackProposalView(leadId, version, accessKey = null) {
-  let lead;
-  let entry;
-
-  if (accessKey) {
-    lead = await Lead.findOne({ 'proposals.accessKey': accessKey });
-    if (!lead) throw AppError.notFound('Proposal not found');
-    entry = lead.proposals.find((p) => p.accessKey === accessKey);
-  } else {
-    lead = await Lead.findById(leadId);
-    if (!lead) throw AppError.notFound('Lead not found');
-    entry = lead.proposals.find((p) => p.version === parseInt(version));
-  }
+export async function trackProposalView(accessKey) {
+  const lead = await Lead.findOne({ 'proposals.accessKey': accessKey });
+  if (!lead) throw AppError.notFound('Proposal not found');
+  const entry = lead.proposals.find((p) => p.accessKey === accessKey);
 
   if (!entry) throw AppError.notFound('Proposal version not found');
   if (!entry.viewedAt) entry.viewedAt = new Date();

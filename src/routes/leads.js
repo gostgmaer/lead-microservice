@@ -48,9 +48,12 @@ router.post('/submit', leadSubmitLimiter, requireTenantHeader, validateSubmitLea
 
 // Proposal view tracking — PUBLIC (called from email link)
 // MUST be declared before router.use(authenticate) below
+// NOTE: the accessKey is the only access grant for these two routes; there is
+// deliberately no by-id/by-version public route (that variant was removed —
+// it looked up leads with no tenant scoping and no access-key check, letting
+// anyone who guessed a Mongo ObjectId view another tenant's proposal).
 router.get('/proposal/view/:accessKey', proposalCtrl.trackProposalViewByKey);
 router.patch('/proposal/accept/:accessKey', proposalCtrl.clientAcceptProposal);
-router.get('/:id/proposal/view/:version', proposalCtrl.trackProposalView);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTHENTICATED ROUTES
